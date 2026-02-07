@@ -1,0 +1,20 @@
+# Dependencies
+node_modules/
+electron-app/node_modules/
+electron-app/dist/
+
+# Backups
+*.bak
+js_modules_backup/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
