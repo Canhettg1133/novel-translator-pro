@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="vi">
 
 <head>
@@ -61,12 +61,15 @@
                         <button class="btn btn-primary" onclick="addApiKey()">
                             ➕ Thêm
                         </button>
+                        <button class="btn btn-success btn-small" onclick="openImportApiKeysModal()" title="Nhập nhiều API Keys cùng lúc">
+                            📥 Nhập nhiều
+                        </button>
                         <button class="btn btn-secondary btn-small" onclick="resetRotationAndRefresh()"
                             title="Reset rotation system (model + key)">
                             🔄
                         </button>
-                        <button class="btn btn-info btn-small" onclick="exportApiKeys()" title="Xem danh sách API Keys">
-                            📋 Xuất Keys
+                        <button class="btn btn-info btn-small" onclick="exportApiKeys()" title="Xuất danh sách API Keys">
+                            📋 Xuất
                         </button>
                     </div>
                 </div>
@@ -74,6 +77,145 @@
                 <!-- API Keys List -->
                 <div class="api-keys-list" id="apiKeysList">
                     <p class="empty-message">Chưa có API key nào. Thêm ít nhất 1 key để bắt đầu dịch.</p>
+                </div>
+            </section>
+
+            <!-- Ollama Local API Panel -->
+            <section class="ollama-panel glass-card" id="ollamaPanel">
+                <h2 class="section-title">
+                    <span class="icon">🦙</span>
+                    Ollama Local AI
+                    <span class="badge ollama-badge" id="ollamaStatus">Tắt</span>
+                </h2>
+
+                <div class="ollama-info-box">
+                    <p>🚀 <strong>Ollama Local:</strong> Dùng AI chạy trên máy tính của bạn, miễn phí và không giới hạn!
+                    </p>
+                    <a href="https://ollama.com/download" target="_blank" class="link">
+                        👉 Tải Ollama tại đây
+                    </a>
+                </div>
+
+                <!-- Toggle Switch -->
+                <div class="ollama-toggle-container">
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="useOllamaToggle" onchange="toggleOllamaMode()">
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <span class="toggle-label">Sử dụng Ollama Local (thay vì Gemini Cloud)</span>
+                </div>
+
+                <!-- Ollama Settings -->
+                <div class="ollama-settings" id="ollamaSettings" style="display: none;">
+
+                    <!-- Server Control -->
+                    <div class="ollama-server-control">
+                        <h4>🖥️ Server Control</h4>
+                        <div class="server-buttons">
+                            <button class="btn btn-success btn-small" onclick="showStartServerGuide()">
+                                ▶️ Hướng dẫn chạy Server
+                            </button>
+                            <button class="btn btn-secondary btn-small" onclick="testOllamaConnection()">
+                                🔍 Test kết nối
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="ollamaUrl">
+                            <span class="icon">🌐</span>
+                            Ollama Server URL
+                        </label>
+                        <input type="text" id="ollamaUrl" value="http://localhost:11434"
+                            placeholder="http://localhost:11434">
+                        <small class="hint">Mặc định: http://localhost:11434</small>
+                    </div>
+
+                    <!-- Model Selection -->
+                    <div class="ollama-model-section">
+                        <h4>🤖 Chọn Model AI</h4>
+
+                        <div class="form-group">
+                            <label for="ollamaModelSelect">
+                                Models đã cài trên server:
+                            </label>
+                            <div class="model-select-row">
+                                <select id="ollamaModelSelect" onchange="selectOllamaModel()">
+                                    <option value="">-- Click "Tải models" để xem --</option>
+                                </select>
+                                <button class="btn btn-info btn-small" onclick="loadOllamaModelsDropdown()">
+                                    📋 Tải models
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="ollamaModel">
+                                <span class="icon">✏️</span>
+                                Hoặc nhập tên model thủ công:
+                            </label>
+                            <input type="text" id="ollamaModel" value="huihui_ai/qwen3-abliterated:4b"
+                                placeholder="model:tag">
+                        </div>
+                    </div>
+
+                    <!-- Model Presets -->
+                    <div class="ollama-presets">
+                        <h4>⚡ Model Presets (Models phổ biến)</h4>
+                        <div class="preset-buttons">
+                            <button class="btn btn-preset" onclick="applyModelPreset('qwen3')">
+                                🧠 Qwen3 (Tốt nhất)
+                            </button>
+                            <button class="btn btn-preset" onclick="applyModelPreset('llama3')">
+                                🦙 Llama3
+                            </button>
+                            <button class="btn btn-preset" onclick="applyModelPreset('gemma2')">
+                                💎 Gemma2
+                            </button>
+                            <button class="btn btn-preset" onclick="applyModelPreset('mistral')">
+                                🌬️ Mistral
+                            </button>
+                            <button class="btn btn-preset" onclick="applyModelPreset('phi3')">
+                                Φ Phi3
+                            </button>
+                        </div>
+                        <small class="hint">Click để tự động cài đặt tối ưu cho từng model</small>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="ollama-actions">
+                        <button class="btn btn-primary btn-small" onclick="testOllamaTranslation()">
+                            🧪 Test dịch thử
+                        </button>
+                    </div>
+
+                    <!-- Speed Info -->
+                    <div class="ollama-speed-info" id="ollamaSpeedInfo" style="display: none;">
+                        <div class="speed-stat">
+                            <span class="speed-label">⚡ Tốc độ:</span>
+                            <span class="speed-value" id="ollamaSpeedValue">--</span>
+                            <span class="speed-unit">giây/chunk</span>
+                        </div>
+                        <div class="speed-stat">
+                            <span class="speed-label">📊 Đã xử lý:</span>
+                            <span class="speed-value" id="ollamaChunksProcessed">0</span>
+                            <span class="speed-unit">chunks</span>
+                        </div>
+                    </div>
+
+                    <!-- Tips -->
+                    <div class="ollama-tips">
+                        <p>💡 <strong>Mẹo tối ưu Ollama:</strong></p>
+                        <ul>
+                            <li>Request song song: <strong>1</strong> (GPU chỉ xử lý 1 lúc)</li>
+                            <li>Delay: <strong>500-1000ms</strong> (không cần 4-5s như Gemini)</li>
+                            <li>Chunk size: <strong>2000-3000</strong> ký tự</li>
+                            <li>Model 7B+ cho chất lượng tốt, 4B cho tốc độ</li>
+                        </ul>
+                    </div>
+
+                    <!-- Test Result -->
+                    <div class="ollama-test-result" id="ollamaTestResult"></div>
                 </div>
             </section>
 
@@ -150,8 +292,8 @@
                             <span class="icon">📦</span>
                             Kích thước chunk (ký tự)
                         </label>
-                        <input type="number" id="chunkSize" value="3000" min="1000" max="8000">
-                        <small class="hint">Khuyến nghị: 2000-4000 ký tự/request</small>
+                        <input type="number" id="chunkSize" value="2000" min="500" max="8000">
+                        <small class="hint">Gemini: 3000-4000 | Ollama: 1500-2500 ký tự</small>
                     </div>
 
                     <!-- Delay -->
@@ -160,8 +302,8 @@
                             <span class="icon">⏱️</span>
                             Delay giữa các batch (ms)
                         </label>
-                        <input type="number" id="delayMs" value="4000" min="1000" max="10000">
-                        <small class="hint">⚠️ Gemini cần 4-5s delay để tránh rate limit</small>
+                        <input type="number" id="delayMs" value="1000" min="100" max="10000">
+                        <small class="hint">Gemini: 4000-5000ms | Ollama: 500-1000ms</small>
                     </div>
                 </div>
             </section>
@@ -342,7 +484,41 @@
     <!-- Toast Notification -->
     <div class="toast-container" id="toastContainer"></div>
 
-    <script src="script.js"></script>
+    <!-- 
+    ============================================== 
+    Novel Translator Pro - Modular JavaScript
+    Thứ tự load quan trọng: app.js (globals) → gemini → translation → ui → history → local-ai
+    ============================================== -->
+
+    <!-- 1. Main App (Global variables, PROMPT_TEMPLATES, GEMINI_MODELS, init) -->
+    <script src="js/app.js"></script>
+
+    <!-- 2. Gemini API -->
+    <script src="js/gemini/model-rotation.js"></script>
+    <script src="js/gemini/api.js"></script>
+
+    <!-- 3. Translation Engine -->
+    <script src="js/translation/chunker.js"></script>
+    <script src="js/translation/retry.js"></script>
+    <script src="js/translation/engine.js"></script>
+
+    <!-- 4. UI Components -->
+    <script src="js/ui/progress.js"></script>
+    <script src="js/ui/file-handler.js"></script>
+    <script src="js/ui/settings.js"></script>
+    <script src="js/ui/controls.js"></script>
+
+    <!-- 5. History -->
+    <script src="js/history/history.js"></script>
+
+    <!-- 6. Local AI (Ollama) -->
+    <script src="js/local-ai/ollama.js"></script>
+
+    <!-- 7. Init (expose globally - PHẢI LOAD CUỐI CÙNG) -->
+    <script src="js/init.js"></script>
+
+    <!-- Backup: Uncomment line below and comment all above to use old monolithic script -->
+    <!-- <script src="script.js.backup"></script> -->
 
     <!-- PWA Service Worker Registration -->
     <script>

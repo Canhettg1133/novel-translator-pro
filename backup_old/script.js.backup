@@ -762,13 +762,7 @@ function maskApiKey(key) {
 }
 
 // ============================================
-// PROMPT TEMPLATES
-// ============================================
-function setPromptTemplate(type) {
-    const textarea = document.getElementById('customPrompt');
-    textarea.value = PROMPT_TEMPLATES[type] || '';
-    showToast('Đã áp dụng mẫu prompt!', 'success');
-}
+// PROMPT TEMPLATES - Sử dụng function ở dưới
 
 // ============================================
 // FILE HANDLING  
@@ -935,9 +929,9 @@ function loadSettings() {
 // TRANSLATION ENGINE - PARALLEL
 // ============================================
 async function startTranslation() {
-    // Validate
-    if (apiKeys.length === 0) {
-        showToast('Vui lòng thêm ít nhất 1 API Key!', 'error');
+    // Validate - Ollama không cần API keys
+    if (!useOllama && apiKeys.length === 0) {
+        showToast('Vui lòng thêm ít nhất 1 API Key hoặc bật Ollama Local!', 'error');
         return;
     }
 
@@ -951,46 +945,63 @@ async function startTranslation() {
     const sourceLang = document.getElementById('sourceLang').value;
     const chunkSize = parseInt(document.getElementById('chunkSize').value) || 4500;
     let parallelCount = parseInt(document.getElementById('parallelCount').value) || 5;
-    const delayMs = parseInt(document.getElementById('delayMs').value) || 100;
+    let delayMs = parseInt(document.getElementById('delayMs').value) || 100;
     const customPrompt = document.getElementById('customPrompt').value;
 
-    // ========== PRE-CHECK: Kiểm tra quota trước khi bắt đầu ==========
-    const availableCombos = getAllAvailableCombinations();
-    if (availableCombos.length === 0) {
-        // Tìm thời gian chờ ngắn nhất
-        const now = Date.now();
-        let minWaitTime = 60000; // Default 60s
+    // ========== OLLAMA MODE: Không cần pre-check quota ==========
+    if (useOllama) {
+        console.log('[Ollama] Mode enabled - skipping Gemini quota checks');
+        // Ollama local chỉ chạy 1 request tại 1 thời điểm (sequential)
+        parallelCount = 1;
+        // Tự động giảm delay cho Ollama (không cần delay lớn như Gemini)
+        if (delayMs > 1000) {
+            console.log(`[Ollama] Auto-reducing delay from ${delayMs}ms to 500ms`);
+            delayMs = 500;
+        }
+        // Reset speed tracking
+        if (typeof resetOllamaSpeed === 'function') {
+            resetOllamaSpeed();
+        }
+    } else {
+        // ========== GEMINI MODE: PRE-CHECK quota trước khi bắt đầu ==========
+        const availableCombos = getAllAvailableCombinations();
+        if (availableCombos.length === 0) {
+            // Tìm thời gian chờ ngắn nhất
+            const now = Date.now();
+            let minWaitTime = 60000; // Default 60s
 
-        for (const pairId in modelKeyHealthMap) {
-            const health = modelKeyHealthMap[pairId];
-            if (health.disabledUntil) {
-                const waitTime = health.disabledUntil - now;
-                if (waitTime > 0 && waitTime < minWaitTime) {
-                    minWaitTime = waitTime;
+            for (const pairId in modelKeyHealthMap) {
+                const health = modelKeyHealthMap[pairId];
+                if (health.disabledUntil) {
+                    const waitTime = health.disabledUntil - now;
+                    if (waitTime > 0 && waitTime < minWaitTime) {
+                        minWaitTime = waitTime;
+                    }
                 }
             }
+
+            // GIỚI HẠN: Chờ tối đa 30 giây
+            const maxWaitMs = 30000;
+            minWaitTime = Math.min(minWaitTime, maxWaitMs);
+
+            const waitSeconds = Math.ceil(minWaitTime / 1000);
+            showToast(`Tất cả API đang cooldown. Tự động chờ ${waitSeconds}s...`, 'warning');
+            console.warn(`[Pre-check] All combinations disabled. Waiting ${waitSeconds}s (max 30s)...`);
+
+            // TỰ ĐỘNG CHỜ với countdown thay vì hỏi user
+            document.getElementById('progressSection').style.display = 'block';
+            await sleepWithCountdown(minWaitTime, '⏳ Chờ API sẵn sàng');
+
+            // Reset health map để thử lại
+            modelKeyHealthMap = {};
         }
 
-        // GIỚI HẠN: Chờ tối đa 30 giây
-        const maxWaitMs = 30000;
-        minWaitTime = Math.min(minWaitTime, maxWaitMs);
-
-        const waitSeconds = Math.ceil(minWaitTime / 1000);
-        showToast(`Tất cả API đang cooldown. Tự động chờ ${waitSeconds}s...`, 'warning');
-        console.warn(`[Pre-check] All combinations disabled. Waiting ${waitSeconds}s (max 30s)...`);
-
-        // TỰ ĐỘNG CHỜ với countdown thay vì hỏi user
-        document.getElementById('progressSection').style.display = 'block';
-        await sleepWithCountdown(minWaitTime, '⏳ Chờ API sẵn sàng');
-
-        // Reset health map để thử lại
-        modelKeyHealthMap = {};
-    }
-
-    // Auto-reduce parallel nếu ít combinations available
-    if (availableCombos.length < parallelCount) {
-        console.log(`[Pre-check] Reducing parallel from ${parallelCount} to ${availableCombos.length}`);
-        parallelCount = Math.max(1, availableCombos.length);
+        // Auto-reduce parallel nếu ít combinations available
+        const currentCombos = getAllAvailableCombinations();
+        if (currentCombos.length < parallelCount) {
+            console.log(`[Pre-check] Reducing parallel from ${parallelCount} to ${currentCombos.length}`);
+            parallelCount = Math.max(1, currentCombos.length);
+        }
     }
 
     // Split text into chunks
@@ -1037,9 +1048,20 @@ async function startTranslation() {
 
     try {
         // Process in parallel batches với STAGGERED START
-        const totalCombinations = apiKeys.length * GEMINI_MODELS.length;
-        const effectiveParallel = Math.min(parallelCount, totalCombinations, 10);
-        const staggerDelayMs = 200; // Delay giữa các parallel requests để tránh spam
+        let effectiveParallel;
+        let staggerDelayMs;
+
+        if (useOllama) {
+            // Ollama mode: chỉ 1 request tại 1 thời điểm
+            effectiveParallel = 1;
+            staggerDelayMs = 0;
+            console.log('[Ollama] Using sequential processing (parallel=1)');
+        } else {
+            // Gemini mode: dựa vào số API keys và models
+            const totalCombinations = apiKeys.length * GEMINI_MODELS.length;
+            effectiveParallel = Math.min(parallelCount, totalCombinations, 10);
+            staggerDelayMs = 200; // Delay giữa các parallel requests để tránh spam
+        }
 
         for (let i = 0; i < chunks.length && !cancelRequested; i += effectiveParallel) {
             // Check pause state
@@ -1211,11 +1233,19 @@ async function translateChunkWithRetry(text, chunkIndex, retries = 5) {
     for (let attempt = 1; attempt <= retries; attempt++) {
         let modelKeyPair = null;
         try {
-            // Get next available (model + key) combination với queue-aware selection
-            modelKeyPair = getNextModelKeyPairWithQueue();
-
             // Dùng temperature khác nhau mỗi lần thử
             const temperature = temperatures[(attempt - 1) % temperatures.length];
+
+            // ========== OLLAMA MODE ==========
+            if (useOllama) {
+                console.log(`[Ollama] Chunk ${chunkIndex + 1}, attempt ${attempt}/${retries}, temp=${temperature}`);
+                const result = await translateWithOllama(text, temperature);
+                return result;
+            }
+
+            // ========== GEMINI MODE ==========
+            // Get next available (model + key) combination với queue-aware selection
+            modelKeyPair = getNextModelKeyPairWithQueue();
 
             const result = await translateChunk(text, modelKeyPair, temperature);
 
@@ -2189,3 +2219,600 @@ function escapeHtml(text) {
 function formatNumber(num) {
     return num.toLocaleString('vi-VN');
 }
+
+// ============================================
+// OLLAMA LOCAL API INTEGRATION
+// ============================================
+
+// Ollama settings
+let useOllama = false;
+let ollamaUrl = 'http://localhost:11434';
+let ollamaModel = 'huihui_ai/qwen3-abliterated:4b';
+
+// Toggle Ollama mode
+function toggleOllamaMode() {
+    const toggle = document.getElementById('useOllamaToggle');
+    const settings = document.getElementById('ollamaSettings');
+    const badge = document.getElementById('ollamaStatus');
+
+    useOllama = toggle.checked;
+
+    if (useOllama) {
+        settings.style.display = 'block';
+        badge.textContent = 'Bật';
+        badge.classList.add('active');
+        showToast('🦙 Đã chuyển sang Ollama Local API!', 'success');
+    } else {
+        settings.style.display = 'none';
+        badge.textContent = 'Tắt';
+        badge.classList.remove('active');
+        showToast('☁️ Đã chuyển sang Gemini Cloud API!', 'info');
+    }
+
+    saveOllamaSettings();
+}
+
+// Test Ollama connection
+async function testOllamaConnection() {
+    const resultDiv = document.getElementById('ollamaTestResult');
+    const url = document.getElementById('ollamaUrl').value.trim();
+    const model = document.getElementById('ollamaModel').value.trim();
+
+    resultDiv.className = 'ollama-test-result info';
+    resultDiv.textContent = '🔍 Đang kiểm tra kết nối...';
+
+    try {
+        // Test connection to Ollama server
+        const response = await fetch(`${url}/api/tags`, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (!response.ok) {
+            throw new Error(`Server trả về lỗi: ${response.status}`);
+        }
+
+        const data = await response.json();
+        console.log('[Ollama] API Response:', data); // Debug log
+
+        const models = data.models || [];
+        console.log('[Ollama] Models found:', models.map(m => m.name)); // Debug log
+
+        // Check if specified model exists - more flexible matching
+        const modelBaseName = model.split(':')[0].toLowerCase();
+        const modelExists = models.some(m => {
+            const installedName = m.name.toLowerCase();
+            return installedName === model.toLowerCase() ||
+                installedName.startsWith(modelBaseName) ||
+                installedName.includes(modelBaseName.split('/').pop());
+        });
+
+        console.log('[Ollama] Looking for:', model, 'Found:', modelExists); // Debug log
+
+        if (modelExists) {
+            resultDiv.className = 'ollama-test-result success';
+            resultDiv.textContent = `✅ Kết nối thành công!\n\n📦 Model "${model}" đã sẵn sàng!\n\n🎉 Bạn có thể bắt đầu dịch với Ollama Local.\n\n📋 Models đã cài: ${models.map(m => m.name).join(', ')}`;
+        } else {
+            resultDiv.className = 'ollama-test-result error';
+            resultDiv.textContent = `⚠️ Kết nối OK nhưng model "${model}" chưa được cài!\n\n📥 Chạy lệnh sau để cài:\n   ollama pull ${model}\n\n📋 Models đã cài: ${models.map(m => m.name).join(', ') || 'Không có'}`;
+        }
+
+    } catch (error) {
+        resultDiv.className = 'ollama-test-result error';
+
+        if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+            resultDiv.textContent = `❌ Không thể kết nối đến Ollama!\n\n🔧 Kiểm tra:\n1. Ollama đã chạy chưa? (ollama serve)\n2. URL đúng chưa? (${url})\n3. Firewall có chặn không?\n\n📥 Tải Ollama: https://ollama.com/download`;
+        } else {
+            resultDiv.textContent = `❌ Lỗi: ${error.message}`;
+        }
+    }
+}
+
+// List installed Ollama models
+async function listOllamaModels() {
+    const resultDiv = document.getElementById('ollamaTestResult');
+    const url = document.getElementById('ollamaUrl').value.trim();
+
+    resultDiv.className = 'ollama-test-result info';
+    resultDiv.textContent = '📋 Đang lấy danh sách models...';
+
+    try {
+        const response = await fetch(`${url}/api/tags`, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (!response.ok) {
+            throw new Error(`Server trả về lỗi: ${response.status}`);
+        }
+
+        const data = await response.json();
+        const models = data.models || [];
+
+        if (models.length === 0) {
+            resultDiv.className = 'ollama-test-result error';
+            resultDiv.textContent = '⚠️ Chưa có model nào được cài!\n\n📥 Cài model khuyến nghị:\n   ollama pull huihui_ai/qwen3-abliterated:4b';
+        } else {
+            resultDiv.className = 'ollama-test-result success';
+            let output = `📦 Có ${models.length} model đã cài:\n\n`;
+            models.forEach((m, i) => {
+                const sizeGB = (m.size / (1024 * 1024 * 1024)).toFixed(1);
+                output += `${i + 1}. ${m.name} (${sizeGB}GB)\n`;
+            });
+            output += '\n💡 Click vào tên model để sử dụng.';
+            resultDiv.textContent = output;
+        }
+
+    } catch (error) {
+        resultDiv.className = 'ollama-test-result error';
+        resultDiv.textContent = `❌ Lỗi: ${error.message}\n\n🔧 Đảm bảo Ollama đang chạy: ollama serve`;
+    }
+}
+
+// Trích xuất kết quả thực từ thinking output của Qwen3
+// Qwen3 thường output: [suy nghĩ...] rồi [kết quả viết lại]
+function extractResultFromThinking(thinkingText) {
+    if (!thinkingText) return '';
+
+    // Các dấu hiệu bắt đầu phần kết quả
+    const resultMarkers = [
+        /Here(?:'s| is) the (?:rewritten|revised|translated|final)(?: version)?:?\s*/gi,
+        /(?:Viết lại|Kết quả|Bản dịch|Đoạn văn viết lại):?\s*/gi,
+        /(?:Final|Rewritten|Revised)(?: version)?:?\s*/gi,
+        /---+\s*/g,  // Dấu phân cách ---
+        /\n\n(?=")/,  // Dòng trống trước dấu ngoặc kép (bắt đầu đoạn văn)
+    ];
+
+    let result = thinkingText;
+
+    // Tìm marker và lấy phần sau đó
+    for (const marker of resultMarkers) {
+        const match = thinkingText.match(marker);
+        if (match) {
+            const idx = thinkingText.lastIndexOf(match[match.length - 1]);
+            if (idx !== -1) {
+                const afterMarker = thinkingText.substring(idx + match[match.length - 1].length).trim();
+                // Chỉ dùng nếu phần sau marker đủ dài (có nội dung thực)
+                if (afterMarker.length > 100) {
+                    result = afterMarker;
+                    console.log(`[Ollama] Extracted result after marker: "${match[match.length - 1].substring(0, 30)}..."`);
+                    break;
+                }
+            }
+        }
+    }
+
+    // Nếu kết quả vẫn chứa nhiều "thinking" text (tiếng Anh giải thích)
+    // Tìm đoạn tiếng Việt dài nhất
+    if (result.includes('Okay') || result.includes('Let me') || result.includes('I need to')) {
+        const vietnameseBlocks = result.split(/\n\n+/).filter(block => {
+            // Block tiếng Việt: chứa dấu tiếng Việt và không bắt đầu bằng tiếng Anh
+            const hasVietnamese = /[àáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]/i.test(block);
+            const startsWithEnglish = /^(Okay|Let me|I need|I'll|First|The|So|Now|Wait|Actually|Hmm)/i.test(block.trim());
+            return hasVietnamese && !startsWithEnglish && block.length > 50;
+        });
+
+        if (vietnameseBlocks.length > 0) {
+            // Lấy block dài nhất
+            result = vietnameseBlocks.reduce((a, b) => a.length > b.length ? a : b);
+            console.log(`[Ollama] Extracted Vietnamese block: ${result.length} chars`);
+        }
+    }
+
+    return result.trim();
+}
+
+// Translate with Ollama API - Using Chat API for better translation
+async function translateWithOllama(text, temperature = 0.7) {
+    const url = document.getElementById('ollamaUrl').value.trim() || ollamaUrl;
+    const model = document.getElementById('ollamaModel').value.trim() || ollamaModel;
+
+    const startTime = Date.now(); // Track processing time
+    console.log(`[Ollama] Calling ${model} at ${url}...`);
+    console.log(`[Ollama] Text length: ${text.length} chars`);
+    console.log(`[Ollama] Text preview:`, text.substring(0, 200) + '...');
+
+    // Text đã chứa prompt từ UI (customPrompt + chunk)
+    // BẬT thinking mode cho Qwen3 để model suy nghĩ và viết lại văn bản tốt hơn
+    let processedText = text;
+
+    const body = {
+        model: model,
+        messages: [
+            { role: 'user', content: processedText }
+        ],
+        stream: false,
+        options: {
+            temperature: temperature,
+            top_p: 0.9,
+            top_k: 40,
+            num_predict: 4096
+        }
+    };
+
+    // Nếu là model Qwen3, BẬT thinking mode để viết lại văn bản tốt hơn
+    if (model.toLowerCase().includes('qwen3')) {
+        body.options.num_ctx = 8192;  // Tăng context window
+        body.think = true;  // BẬT thinking mode - model sẽ suy nghĩ trước khi output
+    }
+
+    // TIMEOUT: 300 giây (5 phút) cho model local với chunk dài
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 300000);
+
+    let response;
+    try {
+        // Sử dụng /api/chat
+        response = await fetch(`${url}/api/chat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+            signal: controller.signal
+        });
+    } catch (fetchError) {
+        clearTimeout(timeoutId);
+        if (fetchError.name === 'AbortError') {
+            throw new Error(`Ollama timeout sau 300s - Chunk quá dài hoặc model quá chậm. Thử giảm chunk size.`);
+        }
+        if (fetchError.message.includes('Failed to fetch')) {
+            throw new Error('Không thể kết nối Ollama. Đảm bảo Ollama đang chạy!');
+        }
+        throw fetchError;
+    }
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMsg = errorData.error || `HTTP ${response.status}`;
+
+        console.error(`[Ollama ERROR] Status: ${response.status}`);
+        console.error(`[Ollama ERROR] Message: ${errorMsg}`);
+
+        throw new Error(errorMsg);
+    }
+
+    const data = await response.json();
+    const processingTime = (Date.now() - startTime) / 1000; // in seconds
+    console.log(`[Ollama] Response received in ${processingTime.toFixed(1)}s`);
+
+    // Update speed tracking
+    if (typeof updateOllamaSpeed === 'function') {
+        updateOllamaSpeed(processingTime);
+    }
+
+    // API chat trả về message.content hoặc message.thinking (Qwen3)
+    if (data.message) {
+        let result = '';
+
+        // Ưu tiên content nếu có
+        if (data.message.content && data.message.content.trim()) {
+            result = data.message.content.trim();
+            console.log(`[Ollama] Using message.content`);
+        }
+        // Qwen3 thinking mode: kết quả trong thinking field
+        else if (data.message.thinking && data.message.thinking.trim()) {
+            let thinkingText = data.message.thinking.trim();
+            console.log(`[Ollama] Using message.thinking (Qwen3 mode)`);
+            console.log(`[Ollama] Thinking length: ${thinkingText.length} chars`);
+
+            // Trích xuất kết quả từ thinking
+            // Model thường kết thúc bằng bản viết lại sau các dấu hiệu như:
+            // "Here's the rewritten...", "Viết lại:", "Kết quả:", etc.
+            result = extractResultFromThinking(thinkingText);
+        }
+
+        if (result) {
+            // Clean up response
+            result = cleanGeminiResponse(result);
+            console.log(`[Ollama] Result length: ${result.length} chars`);
+            return result;
+        }
+    }
+
+    // Fallback cho api/generate format
+    if (data.response) {
+        let result = data.response.trim();
+        result = cleanGeminiResponse(result);
+        return result;
+    }
+
+    console.error('[Ollama] Invalid response:', JSON.stringify(data));
+    throw new Error('Ollama API: Invalid response format');
+}
+
+
+// Modified translateChunk to support both Gemini and Ollama
+async function translateChunkUniversal(text, modelKeyPair, temperature = 0.7) {
+    if (useOllama) {
+        // Use Ollama Local API
+        return await translateWithOllama(text, temperature);
+    } else {
+        // Use Gemini Cloud API (original function)
+        return await translateChunk(text, modelKeyPair, temperature);
+    }
+}
+
+// Save Ollama settings
+function saveOllamaSettings() {
+    ollamaUrl = document.getElementById('ollamaUrl')?.value.trim() || ollamaUrl;
+    ollamaModel = document.getElementById('ollamaModel')?.value.trim() || ollamaModel;
+
+    const ollamaSettings = {
+        useOllama: useOllama,
+        ollamaUrl: ollamaUrl,
+        ollamaModel: ollamaModel
+    };
+
+    localStorage.setItem('novelTranslatorOllamaSettings', JSON.stringify(ollamaSettings));
+    console.log('[Ollama] Settings saved:', ollamaSettings);
+}
+
+// Load Ollama settings
+function loadOllamaSettings() {
+    const saved = localStorage.getItem('novelTranslatorOllamaSettings');
+    if (saved) {
+        try {
+            const settings = JSON.parse(saved);
+            useOllama = settings.useOllama || false;
+            ollamaUrl = settings.ollamaUrl || 'http://localhost:11434';
+            ollamaModel = settings.ollamaModel || 'huihui_ai/qwen3-abliterated:4b';
+
+            // Update UI
+            const toggle = document.getElementById('useOllamaToggle');
+            const settingsDiv = document.getElementById('ollamaSettings');
+            const badge = document.getElementById('ollamaStatus');
+            const urlInput = document.getElementById('ollamaUrl');
+            const modelInput = document.getElementById('ollamaModel');
+
+            if (toggle) toggle.checked = useOllama;
+            if (urlInput) urlInput.value = ollamaUrl;
+            if (modelInput) modelInput.value = ollamaModel;
+
+            if (useOllama) {
+                if (settingsDiv) settingsDiv.style.display = 'block';
+                if (badge) {
+                    badge.textContent = 'Bật';
+                    badge.classList.add('active');
+                }
+            }
+
+            console.log('[Ollama] Settings loaded:', settings);
+        } catch (e) {
+            console.error('[Ollama] Error loading settings:', e);
+        }
+    }
+}
+
+// Add event listeners for Ollama settings
+function setupOllamaEventListeners() {
+    const urlInput = document.getElementById('ollamaUrl');
+    const modelInput = document.getElementById('ollamaModel');
+
+    if (urlInput) {
+        urlInput.addEventListener('change', saveOllamaSettings);
+    }
+    if (modelInput) {
+        modelInput.addEventListener('change', saveOllamaSettings);
+    }
+}
+
+// Load Ollama models into dropdown
+async function loadOllamaModelsDropdown() {
+    const select = document.getElementById('ollamaModelSelect');
+    const url = document.getElementById('ollamaUrl').value.trim() || ollamaUrl;
+
+    select.innerHTML = '<option value="">⏳ Đang tải...</option>';
+
+    try {
+        const response = await fetch(`${url}/api/tags`, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+
+        const data = await response.json();
+        const models = data.models || [];
+
+        if (models.length === 0) {
+            select.innerHTML = '<option value="">❌ Chưa có model nào</option>';
+            showToast('Chưa có model nào được cài. Chạy: ollama pull <model>', 'warning');
+            return;
+        }
+
+        select.innerHTML = '<option value="">-- Chọn model --</option>';
+        models.forEach(m => {
+            const sizeGB = (m.size / (1024 * 1024 * 1024)).toFixed(1);
+            const option = document.createElement('option');
+            option.value = m.name;
+            option.textContent = `${m.name} (${sizeGB}GB)`;
+            select.appendChild(option);
+        });
+
+        // Auto-select current model if exists
+        const currentModel = document.getElementById('ollamaModel').value;
+        if (currentModel) {
+            select.value = currentModel;
+        }
+
+        showToast(`Đã tải ${models.length} models!`, 'success');
+
+    } catch (error) {
+        select.innerHTML = '<option value="">❌ Lỗi kết nối</option>';
+        showToast(`Lỗi: ${error.message}`, 'error');
+    }
+}
+
+// Select model from dropdown
+function selectOllamaModel() {
+    const select = document.getElementById('ollamaModelSelect');
+    const input = document.getElementById('ollamaModel');
+
+    if (select.value) {
+        input.value = select.value;
+        ollamaModel = select.value;
+        saveOllamaSettings();
+        showToast(`Đã chọn model: ${select.value}`, 'success');
+    }
+}
+
+// Track Ollama speed
+let ollamaChunkTimes = [];
+let ollamaTotalChunks = 0;
+
+function updateOllamaSpeed(chunkTime) {
+    ollamaChunkTimes.push(chunkTime);
+    ollamaTotalChunks++;
+
+    // Keep only last 10 chunk times for average
+    if (ollamaChunkTimes.length > 10) {
+        ollamaChunkTimes.shift();
+    }
+
+    const avgTime = ollamaChunkTimes.reduce((a, b) => a + b, 0) / ollamaChunkTimes.length;
+
+    const speedDiv = document.getElementById('ollamaSpeedInfo');
+    const speedValue = document.getElementById('ollamaSpeedValue');
+    const chunksProcessed = document.getElementById('ollamaChunksProcessed');
+
+    if (speedDiv && speedValue && chunksProcessed) {
+        speedDiv.style.display = 'flex';
+        speedValue.textContent = avgTime.toFixed(1);
+        chunksProcessed.textContent = ollamaTotalChunks;
+    }
+}
+
+function resetOllamaSpeed() {
+    ollamaChunkTimes = [];
+    ollamaTotalChunks = 0;
+    const speedDiv = document.getElementById('ollamaSpeedInfo');
+    if (speedDiv) {
+        speedDiv.style.display = 'none';
+    }
+}
+
+// Initialize Ollama on page load
+document.addEventListener('DOMContentLoaded', () => {
+    // Load Ollama settings after a short delay to ensure DOM is ready
+    setTimeout(() => {
+        loadOllamaSettings();
+        setupOllamaEventListeners();
+    }, 100);
+});
+
+// Expose Ollama functions globally
+window.toggleOllamaMode = toggleOllamaMode;
+window.testOllamaConnection = testOllamaConnection;
+window.listOllamaModels = listOllamaModels;
+window.translateWithOllama = translateWithOllama;
+window.loadOllamaModelsDropdown = loadOllamaModelsDropdown;
+window.selectOllamaModel = selectOllamaModel;
+window.updateOllamaSpeed = updateOllamaSpeed;
+window.resetOllamaSpeed = resetOllamaSpeed;
+
+// Test Ollama Translation - Debug function
+async function testOllamaTranslation() {
+    const resultDiv = document.getElementById('ollamaTestResult');
+    const url = document.getElementById('ollamaUrl').value.trim() || 'http://localhost:11434';
+    const model = document.getElementById('ollamaModel').value.trim() || ollamaModel;
+
+    resultDiv.className = 'ollama-test-result info';
+    resultDiv.textContent = '🧪 Đang test dịch thử... Đợi 10-30 giây...';
+
+    let testText = 'Viết lại cho mượt mà: Ta ngửa mặt Quan Thiên, hướng về kia vạn bên trong trời quang chửi ầm lên.';
+
+    const systemPrompt = 'You are a translator. Output ONLY the translation, nothing else. No explanations.';
+
+    console.log('[Test] Starting translation test...');
+    console.log('[Test] URL:', url);
+    console.log('[Test] Model:', model);
+    console.log('[Test] Text:', testText);
+
+    try {
+        const startTime = Date.now();
+
+        const response = await fetch(`${url}/api/chat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                model: model,
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: testText }
+                ],
+                stream: false,
+                think: model.toLowerCase().includes('qwen3') ? true : undefined,
+                options: { num_predict: 256 }
+            })
+        });
+
+        console.log('[Test] Response status:', response.status);
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || `HTTP ${response.status}`);
+        }
+
+        const data = await response.json();
+        const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+
+        console.log('[Test] Full response data:', JSON.stringify(data, null, 2));
+        console.log('[Test] data.message:', data.message);
+        console.log('[Test] data.message type:', typeof data.message);
+        if (data.message) {
+            console.log('[Test] message keys:', Object.keys(data.message));
+            console.log('[Test] message.content:', data.message.content);
+            console.log('[Test] message.role:', data.message.role);
+        }
+
+        // Try multiple response formats
+        let content = null;
+
+        // Format 1: message.content (standard chat API)
+        if (data.message && typeof data.message === 'object' && data.message.content && data.message.content.trim()) {
+            content = data.message.content;
+            console.log('[Test] Using message.content format');
+        }
+        // Format 2: Qwen3 thinking mode (content empty, result in thinking)
+        else if (data.message && data.message.thinking && data.message.thinking.trim()) {
+            content = data.message.thinking;
+            console.log('[Test] Using message.thinking format (Qwen3 mode)');
+        }
+        // Format 3: response (generate API)
+        else if (data.response) {
+            content = data.response;
+            console.log('[Test] Using response format');
+        }
+        // Format 4: Direct string
+        else if (typeof data === 'string') {
+            content = data;
+            console.log('[Test] Using string format');
+        }
+        // Format 5: message is a string directly
+        else if (typeof data.message === 'string') {
+            content = data.message;
+            console.log('[Test] Using message string format');
+        }
+
+        if (content) {
+            resultDiv.className = 'ollama-test-result success';
+            resultDiv.textContent = `✅ THÀNH CÔNG! (${elapsed}s)\n\n📝 Kết quả: ${content}\n\n🎉 Ollama hoạt động tốt!`;
+            console.log('[Test] SUCCESS! Content:', content);
+        } else {
+            console.error('[Test] Unknown response format. Keys:', Object.keys(data));
+            console.error('[Test] data.message value:', JSON.stringify(data.message));
+            resultDiv.className = 'ollama-test-result error';
+            resultDiv.textContent = `❌ Response format lạ. Xem Console để debug.\n\nData keys: ${Object.keys(data).join(', ')}`;
+        }
+
+    } catch (error) {
+        console.error('[Test] Error:', error);
+        resultDiv.className = 'ollama-test-result error';
+        resultDiv.textContent = `❌ LỖI: ${error.message}\n\n🔧 Kiểm tra:\n1. Ollama đang chạy?\n2. Model đã cài?\n3. URL đúng?`;
+    }
+}
+
+window.testOllamaTranslation = testOllamaTranslation;
+
