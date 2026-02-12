@@ -61,14 +61,16 @@
                         <button class="btn btn-primary" onclick="addApiKey()">
                             ➕ Thêm
                         </button>
-                        <button class="btn btn-success btn-small" onclick="openImportApiKeysModal()" title="Nhập nhiều API Keys cùng lúc">
+                        <button class="btn btn-success btn-small" onclick="openImportApiKeysModal()"
+                            title="Nhập nhiều API Keys cùng lúc">
                             📥 Nhập nhiều
                         </button>
                         <button class="btn btn-secondary btn-small" onclick="resetRotationAndRefresh()"
                             title="Reset rotation system (model + key)">
                             🔄
                         </button>
-                        <button class="btn btn-info btn-small" onclick="exportApiKeys()" title="Xuất danh sách API Keys">
+                        <button class="btn btn-info btn-small" onclick="exportApiKeys()"
+                            title="Xuất danh sách API Keys">
                             📋 Xuất
                         </button>
                     </div>
@@ -77,6 +79,59 @@
                 <!-- API Keys List -->
                 <div class="api-keys-list" id="apiKeysList">
                     <p class="empty-message">Chưa có API key nào. Thêm ít nhất 1 key để bắt đầu dịch.</p>
+                </div>
+            </section>
+
+            <!-- Gemini Models Management Panel -->
+            <section class="models-panel glass-card">
+                <h2 class="section-title">
+                    <span class="icon">📦</span>
+                    Quản lý Models Gemini
+                    <span class="badge" id="modelCount">0 models</span>
+                </h2>
+
+                <div class="models-info-box">
+                    <p>⚡ <strong>Models có quota cao (1,500 RPD):</strong> gemini-2.5-pro, gemini-2.0-flash,
+                        gemini-2.0-flash-lite</p>
+                    <p>⚠️ <strong>Models quota thấp (20 RPD):</strong> gemini-2.5-flash, gemini-3-flash-preview</p>
+                </div>
+
+                <!-- Models List -->
+                <div class="models-list" id="modelsList">
+                    <p class="empty-message">Đang tải models...</p>
+                </div>
+
+                <!-- Add Model -->
+                <div class="add-model-section">
+                    <h4>➕ Thêm model</h4>
+
+                    <!-- Preset Selection -->
+                    <div class="add-model-row">
+                        <select id="presetModelSelect" class="model-select">
+                            <option value="">-- Chọn model --</option>
+                        </select>
+                        <button class="btn btn-primary btn-small" onclick="addPresetModel()">
+                            ➕ Thêm
+                        </button>
+                    </div>
+
+                    <!-- Custom Model -->
+                    <div class="add-model-row">
+                        <input type="text" id="customModelName" placeholder="Tên model (vd: gemini-2.0-flash)"
+                            class="model-name-input">
+                        <input type="number" id="customModelQuota" value="15" min="1" max="100"
+                            class="model-quota-input" title="RPM">
+                        <button class="btn btn-secondary btn-small" onclick="addCustomModel()">
+                            ✏️ Thêm thủ công
+                        </button>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="model-actions">
+                        <button class="btn btn-warning btn-small" onclick="resetGeminiModels()">
+                            🔄 Reset mặc định
+                        </button>
+                    </div>
                 </div>
             </section>
 

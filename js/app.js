@@ -176,13 +176,175 @@ function getFictionalPrompt(text) {
 }
 
 // ============================================
-// GEMINI MODELS
+// GEMINI MODELS - Dynamic (loadable from localStorage)
 // ============================================
-const GEMINI_MODELS = [
-    { name: 'gemini-2.5-flash', quota: 10 },
-    { name: 'gemini-2.5-flash-lite', quota: 15 },
-    { name: 'gemini-3-flash-preview', quota: 10 },
+const DEFAULT_GEMINI_MODELS = [
+    { name: 'gemini-2.5-pro', quota: 15, enabled: true },
+    { name: 'gemini-2.0-flash', quota: 15, enabled: true },
+    { name: 'gemini-2.0-flash-lite', quota: 15, enabled: true },
 ];
+
+// Preset models phổ biến để user chọn nhanh
+const PRESET_GEMINI_MODELS = [
+    { name: 'gemini-2.5-pro', quota: 15, label: '⭐ Gemini 2.5 Pro (Chất lượng cao)' },
+    { name: 'gemini-2.0-flash', quota: 15, label: '⚡ Gemini 2.0 Flash (Nhanh + ổn định)' },
+    { name: 'gemini-2.0-flash-lite', quota: 15, label: '🚀 Gemini 2.0 Flash Lite (Nhanh nhất)' },
+    { name: 'gemini-2.5-flash', quota: 5, label: '💎 Gemini 2.5 Flash (RPD thấp)' },
+    { name: 'gemini-2.5-flash-lite', quota: 10, label: '💨 Gemini 2.5 Flash Lite (RPD thấp)' },
+    { name: 'gemini-3-flash-preview', quota: 5, label: '🆕 Gemini 3 Flash Preview (RPD thấp)' },
+    { name: 'gemini-2.0-flash-exp', quota: 15, label: '🧪 Gemini 2.0 Flash Exp (Experimental)' },
+    { name: 'gemini-2.0-pro-exp', quota: 15, label: '🧪 Gemini 2.0 Pro Exp (Experimental)' },
+];
+
+// Dynamic model list - loaded from localStorage
+let GEMINI_MODELS = [];
+
+function loadGeminiModels() {
+    const saved = localStorage.getItem('novelTranslatorModels');
+    if (saved) {
+        try {
+            const parsed = JSON.parse(saved);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+                GEMINI_MODELS = parsed;
+                console.log(`[Models] Loaded ${GEMINI_MODELS.length} models from localStorage`);
+                return;
+            }
+        } catch (e) {
+            console.error('Error loading models:', e);
+        }
+    }
+    // Fallback to defaults
+    GEMINI_MODELS = JSON.parse(JSON.stringify(DEFAULT_GEMINI_MODELS));
+    saveGeminiModels();
+    console.log('[Models] Using default models');
+}
+
+function saveGeminiModels() {
+    localStorage.setItem('novelTranslatorModels', JSON.stringify(GEMINI_MODELS));
+}
+
+function getActiveModels() {
+    return GEMINI_MODELS.filter(m => m.enabled !== false);
+}
+
+function addGeminiModel(name, quota) {
+    name = name.trim().toLowerCase();
+    if (!name) {
+        showToast('Vui lòng nhập tên model!', 'warning');
+        return false;
+    }
+    if (GEMINI_MODELS.some(m => m.name === name)) {
+        showToast('Model này đã tồn tại!', 'error');
+        return false;
+    }
+    GEMINI_MODELS.push({ name, quota: parseInt(quota) || 15, enabled: true });
+    saveGeminiModels();
+    renderModelsList();
+    showToast(`Đã thêm model: ${name}`, 'success');
+    return true;
+}
+
+function removeGeminiModel(index) {
+    if (getActiveModels().length <= 1 && GEMINI_MODELS[index].enabled !== false) {
+        showToast('Phải giữ ít nhất 1 model hoạt động!', 'warning');
+        return;
+    }
+    const removed = GEMINI_MODELS.splice(index, 1)[0];
+    saveGeminiModels();
+    renderModelsList();
+    showToast(`Đã xóa model: ${removed.name}`, 'info');
+}
+
+function toggleGeminiModel(index) {
+    const model = GEMINI_MODELS[index];
+    if (model.enabled !== false && getActiveModels().length <= 1) {
+        showToast('Phải giữ ít nhất 1 model hoạt động!', 'warning');
+        return;
+    }
+    model.enabled = model.enabled === false ? true : false;
+    saveGeminiModels();
+    renderModelsList();
+    showToast(`${model.name}: ${model.enabled ? '✅ Đã bật' : '❌ Đã tắt'}`, 'info');
+}
+
+function updateModelQuota(index, newQuota) {
+    GEMINI_MODELS[index].quota = parseInt(newQuota) || 15;
+    saveGeminiModels();
+    showToast(`Đã cập nhật quota: ${GEMINI_MODELS[index].name} = ${newQuota} RPM`, 'success');
+}
+
+function resetGeminiModels() {
+    if (!confirm('Reset về danh sách model mặc định?')) return;
+    GEMINI_MODELS = JSON.parse(JSON.stringify(DEFAULT_GEMINI_MODELS));
+    saveGeminiModels();
+    renderModelsList();
+    showToast('Đã reset về models mặc định!', 'success');
+}
+
+function addPresetModel() {
+    const select = document.getElementById('presetModelSelect');
+    const selectedName = select.value;
+    if (!selectedName) {
+        showToast('Vui lòng chọn model từ danh sách!', 'warning');
+        return;
+    }
+    const preset = PRESET_GEMINI_MODELS.find(m => m.name === selectedName);
+    if (preset) {
+        if (addGeminiModel(preset.name, preset.quota)) {
+            select.value = '';
+        }
+    }
+}
+
+function addCustomModel() {
+    const nameInput = document.getElementById('customModelName');
+    const quotaInput = document.getElementById('customModelQuota');
+    if (addGeminiModel(nameInput.value, quotaInput.value)) {
+        nameInput.value = '';
+        quotaInput.value = '15';
+    }
+}
+
+function renderModelsList() {
+    const container = document.getElementById('modelsList');
+    const countBadge = document.getElementById('modelCount');
+    if (!container || !countBadge) return;
+
+    const activeModels = getActiveModels();
+    const totalRPM = activeModels.reduce((sum, m) => sum + m.quota, 0);
+    countBadge.textContent = `${activeModels.length}/${GEMINI_MODELS.length} models | ${totalRPM} RPM`;
+
+    if (GEMINI_MODELS.length === 0) {
+        container.innerHTML = '<p class="empty-message">Chưa có model nào.</p>';
+        return;
+    }
+
+    container.innerHTML = GEMINI_MODELS.map((model, index) => {
+        const isEnabled = model.enabled !== false;
+        const statusIcon = isEnabled ? '✅' : '❌';
+        const opacity = isEnabled ? '1' : '0.5';
+        return `
+        <div class="model-item" style="opacity: ${opacity}">
+            <button class="model-toggle-btn" onclick="toggleGeminiModel(${index})" title="${isEnabled ? 'Tắt' : 'Bật'} model">${statusIcon}</button>
+            <span class="model-name">${model.name}</span>
+            <input type="number" class="model-quota-input" value="${model.quota}" min="1" max="100"
+                onchange="updateModelQuota(${index}, this.value)" title="RPM quota">
+            <span class="model-quota-label">RPM</span>
+            <button class="remove-btn" onclick="removeGeminiModel(${index})" title="Xóa">🗑️</button>
+        </div>
+    `}).join('');
+
+    // Update preset dropdown - hide already added models
+    const presetSelect = document.getElementById('presetModelSelect');
+    if (presetSelect) {
+        const currentNames = GEMINI_MODELS.map(m => m.name);
+        presetSelect.innerHTML = '<option value="">-- Chọn model --</option>' +
+            PRESET_GEMINI_MODELS
+                .filter(p => !currentNames.includes(p.name))
+                .map(p => `<option value="${p.name}">${p.label}</option>`)
+                .join('');
+    }
+}
 
 // ============================================
 // INITIALIZATION
@@ -192,12 +354,14 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function initializeApp() {
+    loadGeminiModels();
     loadSettings();
     loadHistory();
     setupEventListeners();
     updateStats();
     renderApiKeysList();
     renderHistoryList();
+    renderModelsList();
 
     // Set default prompt
     const promptEl = document.getElementById('customPrompt');

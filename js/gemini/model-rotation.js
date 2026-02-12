@@ -35,9 +35,10 @@ function isModelKeyAvailable(modelName, keyIndex) {
 
 function getAllAvailableCombinations() {
     const combinations = [];
+    const activeModels = typeof getActiveModels === 'function' ? getActiveModels() : GEMINI_MODELS;
     for (let keyIdx = 0; keyIdx < apiKeys.length; keyIdx++) {
-        for (let modelIdx = 0; modelIdx < GEMINI_MODELS.length; modelIdx++) {
-            const model = GEMINI_MODELS[modelIdx];
+        for (let modelIdx = 0; modelIdx < activeModels.length; modelIdx++) {
+            const model = activeModels[modelIdx];
             if (isModelKeyAvailable(model.name, keyIdx)) {
                 combinations.push({
                     model: model.name,
@@ -59,8 +60,10 @@ function getNextModelKeyPair() {
 
     if (availableCombinations.length === 0) {
         console.warn('[Round-Robin] All combinations disabled, forcing first available');
+        const activeModels = typeof getActiveModels === 'function' ? getActiveModels() : GEMINI_MODELS;
+        const fallbackModel = activeModels.length > 0 ? activeModels[0] : GEMINI_MODELS[0];
         return {
-            model: GEMINI_MODELS[0].name,
+            model: fallbackModel.name,
             keyIndex: 0,
             key: apiKeys[0]
         };

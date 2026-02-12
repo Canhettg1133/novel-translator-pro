@@ -32,6 +32,16 @@ window.closeKeyModal = closeKeyModal;
 window.openImportApiKeysModal = openImportApiKeysModal;
 window.executeImportApiKeys = executeImportApiKeys;
 window.closeImportModal = closeImportModal;
+
+// Model management functions
+window.addGeminiModel = addGeminiModel;
+window.removeGeminiModel = removeGeminiModel;
+window.toggleGeminiModel = toggleGeminiModel;
+window.updateModelQuota = updateModelQuota;
+window.resetGeminiModels = resetGeminiModels;
+window.addPresetModel = addPresetModel;
+window.addCustomModel = addCustomModel;
+
 window.listKeys = () => {
     console.table(apiKeys.map((key, i) => ({ '#': i + 1, 'Key': key })));
     return apiKeys;
