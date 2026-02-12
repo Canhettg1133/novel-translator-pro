@@ -178,58 +178,6 @@ function initKeyHealth(keyIndex) {
     }
 }
 
-function getBestAvailableKey() {
-    const now = Date.now();
-    let bestKeyIndex = -1;
-    let bestScore = -Infinity;
-
-    for (let i = 0; i < apiKeys.length; i++) {
-        initKeyHealth(i);
-        const health = keyHealthMap[i];
-
-        if (health.disabledUntil && now < health.disabledUntil) {
-            continue;
-        }
-
-        if (health.disabledUntil && now >= health.disabledUntil) {
-            health.disabledUntil = null;
-            health.errorCount = Math.floor(health.errorCount / 2);
-            console.log(`[Key ${i + 1}] Re-enabled after cooldown`);
-        }
-
-        const successRate = health.totalRequests > 0
-            ? health.successCount / health.totalRequests
-            : 1;
-        const score = successRate - (health.errorCount * 0.1) - (health.rateLimitHits * 0.2);
-
-        if (score > bestScore) {
-            bestScore = score;
-            bestKeyIndex = i;
-        }
-    }
-
-    return bestKeyIndex;
-}
-
-function getNextAvailableKey(startIndex) {
-    const now = Date.now();
-    for (let i = 0; i < apiKeys.length; i++) {
-        const idx = (startIndex + i) % apiKeys.length;
-        initKeyHealth(idx);
-        const health = keyHealthMap[idx];
-
-        if (health.disabledUntil && now >= health.disabledUntil) {
-            health.disabledUntil = null;
-            health.errorCount = Math.floor(health.errorCount / 2);
-        }
-
-        if (!health.disabledUntil || now >= health.disabledUntil) {
-            return idx;
-        }
-    }
-    return startIndex % apiKeys.length;
-}
-
 function recordKeySuccess(keyIndex) {
     initKeyHealth(keyIndex);
     const health = keyHealthMap[keyIndex];

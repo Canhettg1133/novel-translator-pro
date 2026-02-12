@@ -168,25 +168,7 @@ Quy tắc:
 `
 };
 
-// Function xây dựng prompt theo attempt
-function buildProgressivePrompt(basePrompt, text, attempt) {
-    let finalPrompt = '';
 
-    // Attempt 1-2: Prompt thường
-    if (attempt <= 2) {
-        finalPrompt = basePrompt + text;
-    }
-    // Attempt 3-4: Thêm emphasis
-    else if (attempt <= 4) {
-        finalPrompt = basePrompt + text + PROMPT_ENHANCERS.emphatic;
-    }
-    // Attempt 5+: Literary framing
-    else {
-        finalPrompt = PROMPT_ENHANCERS.literary + basePrompt + text + PROMPT_ENHANCERS.emphatic;
-    }
-
-    return finalPrompt;
-}
 
 // Function lấy fictional prompt (fallback cuối cùng)
 function getFictionalPrompt(text) {
@@ -197,9 +179,9 @@ function getFictionalPrompt(text) {
 // GEMINI MODELS
 // ============================================
 const GEMINI_MODELS = [
-    { name: 'gemini-2.5-flash', quota: 5 },
-    { name: 'gemini-2.5-flash-lite', quota: 10 },
-    { name: 'gemini-3-flash-preview', quota: 5 },
+    { name: 'gemini-2.5-flash', quota: 10 },
+    { name: 'gemini-2.5-flash-lite', quota: 15 },
+    { name: 'gemini-3-flash-preview', quota: 10 },
 ];
 
 // ============================================
