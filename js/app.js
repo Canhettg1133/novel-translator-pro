@@ -32,6 +32,22 @@ let requestTimestamps = {};
 let keyHealthMap = {};
 
 // ============================================
+// PROXY API MODE (BeiJiXingXing, OpenRouter, etc.)
+// ============================================
+let useProxy = false;
+let proxyBaseUrl = 'https://ag.beijixingxing.com/v1/chat/completions';
+let proxyApiKey = '';
+let proxyModel = 'gemini-3-flash-high-真流-[星星公益站-CLI渠道]';
+
+// Proxy model presets - BeiJiXingXing CLI渠道
+// Chỉ giữ model nhanh & ổn định nhất mỗi dòng (真流 = Real streaming)
+const PROXY_MODELS = [
+    { id: 'gemini-3-flash-high-真流-[星星公益站-CLI渠道]', label: '🔥 Gemini 3 Flash HIGH (nhanh, 1100/ngày)', group: 'Khuyên dùng' },
+    { id: 'gemini-2.5-flash-真流-[星星公益站-CLI渠道]', label: '⚡ Gemini 2.5 Flash (ổn định, 1100/ngày)', group: 'Khuyên dùng' },
+    { id: 'gemini-2.5-pro-真流-[星星公益站-CLI渠道]', label: '💎 Gemini 2.5 Pro (chất lượng cao, 520/ngày)', group: 'Khuyên dùng' },
+];
+
+// ============================================
 // PROMPT TEMPLATES
 // ============================================
 const PROMPT_TEMPLATES = {
@@ -179,19 +195,22 @@ function getFictionalPrompt(text) {
 // GEMINI MODELS - Dynamic (loadable from localStorage)
 // ============================================
 const DEFAULT_GEMINI_MODELS = [
-    { name: 'gemini-2.5-pro', quota: 15, enabled: true },
-    { name: 'gemini-2.0-flash', quota: 15, enabled: true },
-    { name: 'gemini-2.0-flash-lite', quota: 15, enabled: true },
+    { name: 'gemini-2.5-flash', quota: 5, enabled: true },
+    { name: 'gemini-2.5-flash-lite', quota: 10, enabled: true },
+    { name: 'gemini-3-flash-preview', quota: 5, enabled: true },
 ];
 
 // Preset models phổ biến để user chọn nhanh
+// ⚠️ Models mới (2.5-pro, 2.0-flash...) có quota cao nhưng chưa chắc API key nào cũng hỗ trợ
 const PRESET_GEMINI_MODELS = [
-    { name: 'gemini-2.5-pro', quota: 15, label: '⭐ Gemini 2.5 Pro (Chất lượng cao)' },
-    { name: 'gemini-2.0-flash', quota: 15, label: '⚡ Gemini 2.0 Flash (Nhanh + ổn định)' },
-    { name: 'gemini-2.0-flash-lite', quota: 15, label: '🚀 Gemini 2.0 Flash Lite (Nhanh nhất)' },
-    { name: 'gemini-2.5-flash', quota: 5, label: '💎 Gemini 2.5 Flash (RPD thấp)' },
-    { name: 'gemini-2.5-flash-lite', quota: 10, label: '💨 Gemini 2.5 Flash Lite (RPD thấp)' },
-    { name: 'gemini-3-flash-preview', quota: 5, label: '🆕 Gemini 3 Flash Preview (RPD thấp)' },
+    // Models cũ - hoạt động với hầu hết API keys
+    { name: 'gemini-2.5-flash', quota: 5, label: '✅ Gemini 2.5 Flash (Ổn định, 20 RPD)' },
+    { name: 'gemini-2.5-flash-lite', quota: 10, label: '✅ Gemini 2.5 Flash Lite (Ổn định, 20 RPD)' },
+    { name: 'gemini-3-flash-preview', quota: 5, label: '✅ Gemini 3 Flash Preview (Ổn định, 20 RPD)' },
+    // Models mới - quota cao nhưng cần key hỗ trợ
+    { name: 'gemini-2.5-pro', quota: 15, label: '⭐ Gemini 2.5 Pro (1,500 RPD - cần key mới)' },
+    { name: 'gemini-2.0-flash', quota: 15, label: '⚡ Gemini 2.0 Flash (1,500 RPD - cần key mới)' },
+    { name: 'gemini-2.0-flash-lite', quota: 15, label: '🚀 Gemini 2.0 Flash Lite (1,500 RPD - cần key mới)' },
     { name: 'gemini-2.0-flash-exp', quota: 15, label: '🧪 Gemini 2.0 Flash Exp (Experimental)' },
     { name: 'gemini-2.0-pro-exp', quota: 15, label: '🧪 Gemini 2.0 Pro Exp (Experimental)' },
 ];
@@ -363,11 +382,23 @@ function initializeApp() {
     renderHistoryList();
     renderModelsList();
 
+    // Init RPD tracker
+    if (typeof initRPDTracker === 'function') {
+        initRPDTracker();
+    }
+
     // Set default prompt
     const promptEl = document.getElementById('customPrompt');
     if (!promptEl.value.trim()) {
         promptEl.value = PROMPT_TEMPLATES.convert;
     }
+
+    // Render RPD dashboard (after a small delay to ensure DOM is ready)
+    setTimeout(() => {
+        if (typeof renderRPDDashboard === 'function') {
+            renderRPDDashboard();
+        }
+    }, 100);
 }
 
 function setupEventListeners() {
@@ -430,6 +461,7 @@ function addApiKey() {
     input.value = '';
     renderApiKeysList();
     saveSettings();
+    if (typeof renderRPDDashboard === 'function') renderRPDDashboard();
     showToast('Đã thêm API Key thành công!', 'success');
 }
 
@@ -446,6 +478,7 @@ function removeApiKey(index) {
 
     renderApiKeysList();
     saveSettings();
+    if (typeof renderRPDDashboard === 'function') renderRPDDashboard();
     showToast('Đã xóa API Key!', 'info');
 }
 
@@ -453,6 +486,7 @@ function resetRotationAndRefresh() {
     resetRotationSystem();
     resetKeyHealth();
     renderApiKeysList();
+    if (typeof renderRPDDashboard === 'function') renderRPDDashboard();
     showToast('Đã reset toàn bộ rotation system!', 'success');
 }
 

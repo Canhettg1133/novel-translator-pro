@@ -1960,3 +1960,184 @@ select option {
         width: 100%;
     }
 }
+
+/* ============================================
+   RPD DASHBOARD
+   ============================================ */
+.rpd-panel {
+    animation-delay: 0.35s;
+}
+
+.rpd-info-box {
+    padding: var(--spacing-md);
+    background: rgba(59, 130, 246, 0.1);
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    border-radius: var(--radius-sm);
+    margin-bottom: var(--spacing-lg);
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+.rpd-actions {
+    display: flex;
+    gap: var(--spacing-sm);
+    margin-top: var(--spacing-md);
+}
+
+/* RPD Summary */
+.rpd-summary {
+    margin-bottom: var(--spacing-lg);
+}
+
+.rpd-summary-bar {
+    margin-bottom: var(--spacing-sm);
+}
+
+.rpd-bar-track {
+    height: 10px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: var(--radius-full);
+    overflow: hidden;
+    margin-bottom: var(--spacing-sm);
+}
+
+.rpd-bar-fill {
+    height: 100%;
+    border-radius: var(--radius-full);
+    transition: width 0.5s ease, background 0.3s ease;
+}
+
+.rpd-summary-text {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--spacing-xs);
+}
+
+.rpd-summary-info {
+    display: flex;
+    gap: var(--spacing-lg);
+    flex-wrap: wrap;
+}
+
+.rpd-info-item {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+/* RPD Key List */
+.rpd-key-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.rpd-key-row {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    transition: all var(--transition-fast);
+}
+
+.rpd-key-row:hover {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+.rpd-key-row.rpd-exhausted {
+    opacity: 0.4;
+    background: rgba(239, 68, 68, 0.05);
+    border-color: rgba(239, 68, 68, 0.15);
+}
+
+.rpd-key-header {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    width: 100%;
+}
+
+.rpd-key-index {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 32px;
+    height: 24px;
+    padding: 0 6px;
+    border-radius: var(--radius-full);
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: white;
+    flex-shrink: 0;
+}
+
+.rpd-models-bars {
+    display: flex;
+    gap: var(--spacing-sm);
+    flex: 1;
+    flex-wrap: wrap;
+}
+
+.rpd-model-badge {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: var(--radius-full);
+    font-size: 0.72rem;
+    flex: 1;
+    min-width: 100px;
+}
+
+.rpd-model-name {
+    color: var(--text-muted);
+    font-weight: 500;
+    white-space: nowrap;
+    font-size: 0.68rem;
+    min-width: 50px;
+}
+
+.rpd-mini-bar {
+    flex: 1;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 2px;
+    overflow: hidden;
+    min-width: 30px;
+}
+
+.rpd-mini-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.3s ease;
+}
+
+.rpd-model-count {
+    font-weight: 700;
+    font-size: 0.75rem;
+    min-width: 16px;
+    text-align: right;
+}
+
+/* Responsive RPD */
+@media (max-width: 768px) {
+    .rpd-models-bars {
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .rpd-model-badge {
+        min-width: unset;
+    }
+
+    .rpd-summary-text {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}

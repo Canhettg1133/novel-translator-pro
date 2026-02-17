@@ -7,9 +7,9 @@
 // MAIN TRANSLATION ENGINE
 // ============================================
 async function startTranslation() {
-    // Validate - Ollama không cần API keys
-    if (!useOllama && apiKeys.length === 0) {
-        showToast('Vui lòng thêm ít nhất 1 API Key hoặc bật Ollama Local!', 'error');
+    // Validate - Ollama/Proxy không cần API keys
+    if (!useOllama && !useProxy && apiKeys.length === 0) {
+        showToast('Vui lòng thêm ít nhất 1 API Key, bật Ollama Local, hoặc bật Proxy API!', 'error');
         return;
     }
 
@@ -37,6 +37,15 @@ async function startTranslation() {
         if (typeof resetOllamaSpeed === 'function') {
             resetOllamaSpeed();
         }
+    } else if (useProxy) {
+        // ========== PROXY MODE ==========
+        console.log('[Proxy] Mode enabled - skipping Gemini quota checks');
+        parallelCount = 1; // Proxy RPM rất thấp (~5/phút), phải tuần tự
+        if (delayMs < 5000) {
+            console.log(`[Proxy] Auto-increasing delay from ${delayMs}ms to 5000ms (proxy cần delay cao)`);
+            delayMs = 5000;
+        }
+        console.log(`[Proxy] Using parallel=${parallelCount}, delay=${delayMs}ms, model=${proxyModel}`);
     } else {
         // ========== GEMINI MODE: PRE-CHECK quota ==========
         const availableCombos = getAllAvailableCombinations();
@@ -125,10 +134,14 @@ async function startTranslation() {
             effectiveParallel = 1;
             staggerDelayMs = 0;
             console.log('[Ollama] Using sequential processing (parallel=1)');
+        } else if (useProxy) {
+            effectiveParallel = 1; // Tuần tự - proxy RPM thấp
+            staggerDelayMs = 0;
+            console.log(`[Proxy] Using sequential processing (parallel=1)`);
         } else {
             const totalCombinations = apiKeys.length * GEMINI_MODELS.length;
             effectiveParallel = Math.min(parallelCount, totalCombinations, 10);
-            staggerDelayMs = 200;
+            staggerDelayMs = 500;
         }
 
         for (let i = 0; i < chunks.length && !cancelRequested; i += effectiveParallel) {
@@ -173,6 +186,11 @@ async function startTranslation() {
 
             updateProgress(completedChunks, chunks.length, `Đang dịch chunk ${completedChunks}/${chunks.length}...`);
             updateProgressStats(speed.toFixed(1), currentActiveKeys, formatTime(eta));
+
+            // Cập nhật RPD dashboard
+            if (typeof renderRPDDashboard === 'function') {
+                renderRPDDashboard();
+            }
 
             // Update preview - GIỮ ĐÚNG THỨ TỰ, không filter null
             document.getElementById('translatedText').value = translatedChunks
@@ -247,12 +265,20 @@ async function startTranslation() {
                             }
 
                             const highTemp = 0.7 + (round * 0.15);
-                            const modelKeyPair = getNextModelKeyPair();
-                            const result = await translateChunk(promptToUse, modelKeyPair, highTemp);
+
+                            let result;
+                            if (useProxy) {
+                                result = await translateChunkViaProxy(promptToUse, highTemp);
+                            } else {
+                                const modelKeyPair = getNextModelKeyPair();
+                                result = await translateChunk(promptToUse, modelKeyPair, highTemp);
+                                if (result && !result.startsWith('[LỖI') && !result.startsWith('[AUTO-SPLIT]')) {
+                                    recordKeySuccess(modelKeyPair.keyIndex);
+                                }
+                            }
 
                             if (result && !result.startsWith('[LỖI') && !result.startsWith('[AUTO-SPLIT]')) {
                                 translatedChunks[idx] = result;
-                                recordKeySuccess(modelKeyPair.keyIndex);
                                 console.log(`[AUTO-RETRY] Chunk ${idx + 1} SUCCESS at round ${round}!`);
                             } else {
                                 stillFailed.push(idx);

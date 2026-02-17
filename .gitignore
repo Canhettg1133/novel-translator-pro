@@ -2,11 +2,26 @@
 node_modules/
 electron-app/node_modules/
 electron-app/dist/
+
+# Build output
 dist/
 
 # Backups
 *.bak
 js_modules_backup/
+backup_old/
+
+# Test files
+test_openrouter.html
+test_stats.txt
+api_test.txt
+api_test2.txt
+
+# Text notes
+free_models.txt
+gemini_list.txt
+model_details.txt
+proxy_models.txt
 
 # OS files
 .DS_Store
@@ -19,3 +34,6 @@ Thumbs.db
 # Logs
 *.log
 npm-debug.log*
+
+# Gemini agent
+.gemini/

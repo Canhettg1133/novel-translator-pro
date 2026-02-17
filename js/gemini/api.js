@@ -1,12 +1,105 @@
 /**
  * Novel Translator Pro - Gemini API
- * Gọi Gemini Cloud API để dịch văn bản
+ * Gọi Gemini Cloud API hoặc Proxy API để dịch văn bản
  */
 
 // ============================================
-// GEMINI TRANSLATE CHUNK
+// PROXY API - OpenAI Compatible (BeiJiXingXing, OpenRouter...)
+// ============================================
+async function translateChunkViaProxy(text, temperature = 0.7) {
+    if (!proxyApiKey) throw new Error('Chưa nhập API Key proxy!');
+    if (!proxyBaseUrl) throw new Error('Chưa cấu hình Proxy Base URL!');
+
+    console.log(`[Proxy] Model: ${proxyModel} | Temp: ${temperature}`);
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 min timeout
+
+    let response;
+    try {
+        response = await fetch(proxyBaseUrl, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${proxyApiKey}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                model: proxyModel,
+                messages: [{ role: 'user', content: text }],
+                temperature: temperature,
+                max_tokens: 16384
+            }),
+            signal: controller.signal
+        });
+    } catch (fetchError) {
+        clearTimeout(timeoutId);
+        if (fetchError.name === 'AbortError') {
+            throw new Error(`Proxy timeout sau 120s - ${proxyModel}`);
+        }
+        throw fetchError;
+    }
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMsg = errorData.error?.message || `HTTP ${response.status}`;
+
+        console.error(`[Proxy ERROR] Status: ${response.status} | ${errorMsg}`);
+
+        if (response.status === 429) {
+            throw new Error(`429 - Proxy rate limited: ${errorMsg}`);
+        }
+        if (response.status === 403) {
+            // CONSUMER_SUSPENDED - proxy backend key bị ban, retry sẽ xoay sang key khác
+            console.warn(`[Proxy] 403 - Backend suspended, proxy sẽ xoay key khác khi retry...`);
+            throw new Error(`403 - Backend key suspended (sẽ xoay key khác): ${errorMsg.substring(0, 100)}`);
+        }
+        if (response.status === 402) {
+            throw new Error(`402 - Proxy quota hết: ${errorMsg}`);
+        }
+        if (response.status === 401) {
+            throw new Error('API Key proxy không hợp lệ!');
+        }
+        if (response.status === 404) {
+            throw new Error(`Model "${proxyModel}" không tìm thấy trên proxy!`);
+        }
+
+        throw new Error(errorMsg);
+    }
+
+    const data = await response.json();
+
+    // Extract response - OpenAI format
+    const content = data.choices?.[0]?.message?.content?.trim();
+    if (!content) {
+        console.error('[Proxy ERROR] Empty response:', data);
+        throw new Error('Proxy API: Empty response');
+    }
+
+    let result = cleanGeminiResponse(content);
+
+    // Validation
+    const validationResult = validateTranslationOutput(text, result);
+    if (!validationResult.valid) {
+        console.error(`[❌ VALIDATION FAILED] ${validationResult.reason}`);
+        throw new Error(`${validationResult.errorCode}:${validationResult.details}`);
+    }
+    if (validationResult.warning) {
+        console.warn(`[⚠️ WARNING] ${validationResult.warning}`);
+    }
+
+    return result;
+}
+
+// ============================================
+// GEMINI TRANSLATE CHUNK (Direct API hoặc auto-route qua Proxy)
 // ============================================
 async function translateChunk(text, modelKeyPair, temperature = 0.7) {
+    // ===== AUTO-ROUTE: Nếu bật proxy, gọi proxy thay vì Gemini Direct =====
+    if (useProxy) {
+        return await translateChunkViaProxy(text, temperature);
+    }
+
     const { model: modelName, key: apiKey, keyIndex } = modelKeyPair;
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
 
@@ -30,9 +123,9 @@ async function translateChunk(text, modelKeyPair, temperature = 0.7) {
         ]
     };
 
-    // TIMEOUT: 30 giây
+    // TIMEOUT: 120 giây (gemini-2.5-flash thinking cần 60-90s cho text dài)
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    const timeoutId = setTimeout(() => controller.abort(), 120000);
 
     let response;
     try {
@@ -45,7 +138,7 @@ async function translateChunk(text, modelKeyPair, temperature = 0.7) {
     } catch (fetchError) {
         clearTimeout(timeoutId);
         if (fetchError.name === 'AbortError') {
-            throw new Error(`API timeout sau 30s - ${modelName} + Key ${keyIndex + 1}`);
+            throw new Error(`API timeout sau 120s - ${modelName} + Key ${keyIndex + 1}`);
         }
         throw fetchError;
     }
@@ -96,15 +189,21 @@ async function translateChunk(text, modelKeyPair, temperature = 0.7) {
         return result;
     }
 
-    // Check for blocked content
+    // Check for blocked content - THROW ERROR instead of returning original text
     if (data.candidates?.[0]?.finishReason === 'SAFETY') {
         console.warn('[Gemini API] Content blocked by SAFETY filter');
-        return text;
+        throw new Error('CONTENT_BLOCKED:safety_filter');
     }
 
     if (data.promptFeedback?.blockReason === 'PROHIBITED_CONTENT') {
         console.warn('[Gemini API] Content blocked by PROHIBITED_CONTENT filter');
-        return text;
+        throw new Error('CONTENT_BLOCKED:prohibited_content');
+    }
+
+    // Check for empty/missing response
+    if (!data.candidates || data.candidates.length === 0) {
+        console.error('[Gemini API ERROR] No candidates in response');
+        throw new Error('CONTENT_BLOCKED:no_candidates');
     }
 
     console.error('[Gemini API ERROR] Invalid response format:', data);
@@ -123,15 +222,28 @@ function validateTranslationOutput(original, translated) {
         details: null
     };
 
-    // Tính ratio
-    const inputLength = original.length;
+    // Strip prompt from original để so sánh chính xác
+    // Prompt kết thúc bằng "ĐOẠN VĂN:" hoặc "ĐOẠN VĂN CẦN VIẾT LẠI:" hoặc tương tự
+    let contentOnly = original;
+    const promptEndMarkers = ['ĐOẠN VĂN:', 'ĐOẠN VĂN CẦN VIẾT LẠI:', 'NỘI DUNG:',
+        'BẮT ĐẦU NGAY.', 'BẮT ĐẦU NGAY VỚI NỘI DUNG.]'];
+    for (const marker of promptEndMarkers) {
+        const idx = original.indexOf(marker);
+        if (idx !== -1) {
+            contentOnly = original.substring(idx + marker.length).trim();
+            break;
+        }
+    }
+
+    // Tính ratio dựa trên content thực (không bao gồm prompt)
+    const inputLength = contentOnly.length;
     const outputLength = translated.length;
-    const ratio = outputLength / inputLength;
+    const ratio = inputLength > 0 ? outputLength / inputLength : 1;
 
-    console.log(`[Validation] Input=${inputLength}, Output=${outputLength}, Ratio=${Math.round(ratio * 100)}%`);
+    console.log(`[Validation] ContentOnly=${inputLength}, Output=${outputLength}, Ratio=${Math.round(ratio * 100)}%`);
 
-    // ========== 1. CHECK ĐỘ DÀI (50% threshold) ==========
-    if (ratio < 0.5) {
+    // ========== 1. CHECK ĐỘ DÀI (40% threshold - giảm xuống vì AI có thể viết gọn hơn) ==========
+    if (ratio < 0.4) {
         result.valid = false;
         result.reason = `Output quá ngắn! Chỉ ${Math.round(ratio * 100)}% so với input`;
         result.errorCode = 'OUTPUT_TOO_SHORT';
@@ -140,7 +252,7 @@ function validateTranslationOutput(original, translated) {
     }
 
     // Warning nếu hơi ngắn
-    if (ratio < 0.65) {
+    if (ratio < 0.6) {
         result.warning = `Output hơi ngắn: ${Math.round(ratio * 100)}% so với input`;
     }
 

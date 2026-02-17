@@ -32,16 +32,6 @@ window.closeKeyModal = closeKeyModal;
 window.openImportApiKeysModal = openImportApiKeysModal;
 window.executeImportApiKeys = executeImportApiKeys;
 window.closeImportModal = closeImportModal;
-
-// Model management functions
-window.addGeminiModel = addGeminiModel;
-window.removeGeminiModel = removeGeminiModel;
-window.toggleGeminiModel = toggleGeminiModel;
-window.updateModelQuota = updateModelQuota;
-window.resetGeminiModels = resetGeminiModels;
-window.addPresetModel = addPresetModel;
-window.addCustomModel = addCustomModel;
-
 window.listKeys = () => {
     console.table(apiKeys.map((key, i) => ({ '#': i + 1, 'Key': key })));
     return apiKeys;
@@ -52,5 +42,12 @@ if (typeof testOllamaConnection === 'function') window.testOllamaConnection = te
 if (typeof loadOllamaModels === 'function') window.loadOllamaModels = loadOllamaModels;
 if (typeof toggleOllama === 'function') window.toggleOllama = toggleOllama;
 if (typeof selectOllamaModel === 'function') window.selectOllamaModel = selectOllamaModel;
+
+// Proxy functions
+if (typeof toggleProxyMode === 'function') window.toggleProxyMode = toggleProxyMode;
+if (typeof testProxyConnection === 'function') window.testProxyConnection = testProxyConnection;
+if (typeof selectProxyModel === 'function') window.selectProxyModel = selectProxyModel;
+if (typeof updateProxyConfig === 'function') window.updateProxyConfig = updateProxyConfig;
+if (typeof initProxyUI === 'function') initProxyUI();
 
 console.log('✅ All modules loaded and exposed globally');

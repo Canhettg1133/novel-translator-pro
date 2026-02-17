@@ -62,6 +62,36 @@ async function translateChunkWithRetry(text, chunkIndex, retries = 5) {
                 return result;
             }
 
+            // ========== PROXY MODE ==========
+            if (useProxy) {
+                // Progressive prompt cho Proxy (giống Gemini)
+                let promptToUse = text;
+
+                if (shortOutputCount > 0) {
+                    const basePrompt = document.getElementById('customPrompt')?.value || '';
+                    const contentOnly = originalText.replace(basePrompt, '').trim();
+
+                    if (shortOutputCount === 1) {
+                        promptToUse = basePrompt + contentOnly + (typeof PROMPT_ENHANCERS !== 'undefined' ? PROMPT_ENHANCERS.emphatic : '');
+                        console.log(`[Proxy] Chunk ${chunkIndex + 1} 🔄 Using EMPHATIC prompt (attempt ${attempt})`);
+                    } else if (shortOutputCount === 2) {
+                        promptToUse = (typeof PROMPT_ENHANCERS !== 'undefined' ? PROMPT_ENHANCERS.literary : '') +
+                            basePrompt + contentOnly +
+                            (typeof PROMPT_ENHANCERS !== 'undefined' ? PROMPT_ENHANCERS.emphatic : '');
+                        console.log(`[Proxy] Chunk ${chunkIndex + 1} 🔄 Using LITERARY prompt (attempt ${attempt})`);
+                    } else {
+                        promptToUse = typeof getFictionalPrompt === 'function' ?
+                            getFictionalPrompt(contentOnly) :
+                            contentOnly;
+                        console.log(`[Proxy] Chunk ${chunkIndex + 1} 🔄 Using FICTIONAL prompt (attempt ${attempt})`);
+                    }
+                }
+
+                console.log(`[Proxy] Chunk ${chunkIndex + 1}, attempt ${attempt}/${retries}, temp=${temperature}, model=${proxyModel}`);
+                const result = await translateChunkViaProxy(promptToUse, temperature);
+                return result;
+            }
+
             // ========== GEMINI MODE ==========
             modelKeyPair = getNextModelKeyPairWithQueue();
 
@@ -100,6 +130,24 @@ async function translateChunkWithRetry(text, chunkIndex, retries = 5) {
 
         } catch (error) {
             const errorMsg = error.message.toLowerCase();
+
+            // ========== PROXY MODE: XỬ LÝ 403/429 ĐẶC BIỆT ==========
+            if (useProxy) {
+                const is403 = errorMsg.includes('403') || errorMsg.includes('suspended');
+                const is429 = errorMsg.includes('429') || errorMsg.includes('rate limit');
+
+                if (is403 || is429) {
+                    const waitTime = is403 ? 5000 : 8000;
+                    console.warn(`[Proxy] Chunk ${chunkIndex + 1} ⚠️ ${is403 ? '403 Backend suspended' : '429 Rate limited'}, chờ ${waitTime / 1000}s rồi retry...`);
+
+                    if (attempt === retries) {
+                        throw error;
+                    }
+
+                    await sleep(waitTime);
+                    continue;
+                }
+            }
 
             // ========== XỬ LÝ OUTPUT QUÁ NGẮN ==========
             const isOutputTooShort = error.message.includes('OUTPUT_TOO_SHORT');
@@ -204,6 +252,19 @@ async function translateChunkWithRetry(text, chunkIndex, retries = 5) {
                     if (retryMatch) {
                         cooldownSeconds = Math.ceil(parseFloat(retryMatch[1])) + 2;
                     }
+
+                    // Kiểm tra xem có phải hết RPD không
+                    // Nếu RPD đã dùng >= 18 (gần hết 20), đánh dấu pair là hết RPD
+                    if (typeof getRPDUsed === 'function') {
+                        const rpdUsed = getRPDUsed(modelKeyPair.model, modelKeyPair.keyIndex);
+                        if (rpdUsed >= 18) {
+                            console.warn(`[Chunk ${chunkIndex + 1}] RPD gần hết (${rpdUsed}/20), đánh dấu pair hết RPD ngày`);
+                            if (typeof markPairRPDExhausted === 'function') {
+                                markPairRPDExhausted(modelKeyPair.model, modelKeyPair.keyIndex);
+                            }
+                            cooldownSeconds = 3600; // Disable 1 giờ thay vì 60s
+                        }
+                    }
                 } else if (isNotFound) {
                     cooldownSeconds = 300;
                 }
@@ -284,10 +345,16 @@ async function translateLargeChunkBySplitting(text, chunkIndex) {
         console.log(`[Chunk ${chunkIndex + 1}] Translating sub-chunk ${i + 1}/${parts.length}...`);
 
         try {
-            const modelKeyPair = getNextModelKeyPair();
-            const result = await translateChunk(partText, modelKeyPair, 0.8);
-            translatedParts.push(result.replace('[AUTO-SPLIT]', ''));
-            recordKeySuccess(modelKeyPair.keyIndex);
+            if (useProxy) {
+                // Proxy mode - gọi trực tiếp, không cần model/key pair
+                const result = await translateChunkViaProxy(partText, 0.8);
+                translatedParts.push(result.replace('[AUTO-SPLIT]', ''));
+            } else {
+                const modelKeyPair = getNextModelKeyPair();
+                const result = await translateChunk(partText, modelKeyPair, 0.8);
+                translatedParts.push(result.replace('[AUTO-SPLIT]', ''));
+                recordKeySuccess(modelKeyPair.keyIndex);
+            }
         } catch (e) {
             console.warn(`[Chunk ${chunkIndex + 1}] Sub-chunk ${i + 1} failed: ${e.message}`);
             // Giữ nguyên text gốc nếu sub-chunk fail

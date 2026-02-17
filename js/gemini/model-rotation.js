@@ -40,6 +40,10 @@ function getAllAvailableCombinations() {
         for (let modelIdx = 0; modelIdx < activeModels.length; modelIdx++) {
             const model = activeModels[modelIdx];
             if (isModelKeyAvailable(model.name, keyIdx)) {
+                // Kiểm tra RPD availability
+                if (typeof isPairRPDAvailable === 'function' && !isPairRPDAvailable(model.name, keyIdx)) {
+                    continue; // Bỏ qua pair đã hết RPD
+                }
                 combinations.push({
                     model: model.name,
                     keyIndex: keyIdx,
@@ -129,17 +133,27 @@ function getBestAvailablePair() {
 
             if (!isModelKeyAvailable(model.name, keyIdx)) continue;
 
+            // Kiểm tra RPD availability
+            if (typeof isPairRPDAvailable === 'function' && !isPairRPDAvailable(model.name, keyIdx)) {
+                continue; // Bỏ qua pair đã hết RPD ngày
+            }
+
             const recentCount = getRecentRequestCount(model.name, keyIdx);
             const quota = model.quota;
             const remainingQuota = quota - recentCount;
 
             if (remainingQuota > 0) {
+                // Tính thêm RPD remaining vào score
+                const rpdRemaining = typeof getRPDRemaining === 'function' ? getRPDRemaining(model.name, keyIdx) : 20;
+                const rpdFactor = rpdRemaining / 20; // 0..1
+
                 scoredCombinations.push({
                     model: model.name,
                     keyIndex: keyIdx,
                     key: apiKeys[keyIdx],
                     remainingQuota: remainingQuota,
-                    score: remainingQuota / quota
+                    rpdRemaining: rpdRemaining,
+                    score: (remainingQuota / quota) * 0.5 + rpdFactor * 0.5 // Cân bằng RPM + RPD
                 });
             }
         }
@@ -153,7 +167,7 @@ function getBestAvailablePair() {
     scoredCombinations.sort((a, b) => b.score - a.score);
 
     const selected = scoredCombinations[0];
-    console.log(`[Queue] Selected: Key ${selected.keyIndex + 1}, Model ${selected.model} (${selected.remainingQuota} quota left)`);
+    console.log(`[Queue] Selected: Key ${selected.keyIndex + 1}, Model ${selected.model} (RPM: ${selected.remainingQuota}, RPD: ${selected.rpdRemaining})`);
 
     return selected;
 }
@@ -161,6 +175,10 @@ function getBestAvailablePair() {
 function getNextModelKeyPairWithQueue() {
     const pair = getBestAvailablePair();
     recordRequestTimestamp(pair.model, pair.keyIndex);
+    // Ghi nhận RPD
+    if (typeof recordRPDRequest === 'function') {
+        recordRPDRequest(pair.model, pair.keyIndex);
+    }
     return pair;
 }
 
