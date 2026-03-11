@@ -80,26 +80,14 @@ function downloadResult() {
         showToast('Không có nội dung để tải!', 'warning');
         return;
     }
-
-    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = originalFileName;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-
-    showToast('Đã tải file thành công!', 'success');
+    downloadTextFile(text, originalFileName);
 }
 
 // Download partial - tải phần đã dịch được
 function downloadPartial() {
-    // Giữ đúng thứ tự, thay null bằng placeholder
+    // Giữ đúng thứ tự, chỉ lấy chunks đã dịch
     const translatedParts = translatedChunks
-        .map((c, i) => c !== null && c !== undefined ? c : `[⏳ Chunk ${i + 1} chưa dịch]`)
-        .filter((c, i) => translatedChunks[i] !== null && translatedChunks[i] !== undefined);
+        .filter(c => c !== null && c !== undefined);
 
     if (translatedParts.length === 0) {
         showToast('Chưa có nội dung nào được dịch!', 'warning');
@@ -108,18 +96,66 @@ function downloadPartial() {
 
     const text = translatedParts.join('\n\n');
     const partialFileName = originalFileName.replace('.txt', `_partial_${completedChunks}chunks.txt`);
-
-    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = partialFileName;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-
+    downloadTextFile(text, partialFileName);
     showToast(`Đã tải ${completedChunks} chunks đã dịch!`, 'success');
+}
+
+// Shared download helper — 3-tier approach for maximum compatibility
+function downloadTextFile(text, fileName) {
+    // TIER 1: Web Share API (best for Android — opens native share sheet)
+    if (navigator.share && navigator.canShare) {
+        try {
+            const file = new File([text], fileName, { type: 'text/plain' });
+            if (navigator.canShare({ files: [file] })) {
+                navigator.share({
+                    title: fileName,
+                    files: [file]
+                }).then(() => {
+                    showToast(`💾 File "${fileName}" đã được chia sẻ/lưu!`, 'success');
+                }).catch(err => {
+                    // User cancelled share — that's OK
+                    if (err.name !== 'AbortError') {
+                        console.warn('[Download] Share failed, trying blob download:', err);
+                        downloadViaBlobLink(text, fileName);
+                    }
+                });
+                return; // Share dialog opened
+            }
+        } catch (e) {
+            console.warn('[Download] Share API error:', e);
+        }
+    }
+
+    // TIER 2: Blob download (works on desktop browsers, sometimes works on Android)
+    downloadViaBlobLink(text, fileName);
+}
+
+// Blob download approach
+function downloadViaBlobLink(text, fileName) {
+    try {
+        const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }, 1000);
+        showToast(`💾 Đang tải "${fileName}" — kiểm tra thư mục Downloads!`, 'success');
+    } catch (e) {
+        // TIER 3: Copy to clipboard as last resort
+        navigator.clipboard.writeText(text).then(() => {
+            showToast('📋 Không tải được file. Đã copy nội dung vào clipboard!', 'info');
+        }).catch(() => {
+            const ta = document.getElementById('translatedText');
+            if (ta) { ta.value = text; ta.select(); }
+            showToast('⚠️ Hãy chọn text trong ô kết quả và copy thủ công.', 'warning');
+        });
+    }
 }
 
 // ============================================

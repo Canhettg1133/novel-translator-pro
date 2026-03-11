@@ -366,33 +366,8 @@ function downloadMobileResult() {
         showToast('Chưa có kết quả!', 'warning');
         return;
     }
-    
     const fileName = `translated_${new Date().toISOString().slice(0, 10)}.txt`;
-    
-    try {
-        const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = fileName;
-        a.style.display = 'none';
-        document.body.appendChild(a);
-        a.click();
-        
-        setTimeout(() => {
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        }, 1000);
-        
-        showToast(`💾 Đang tải "${fileName}" — kiểm tra thư mục Downloads trên điện thoại!`, 'success');
-    } catch (e) {
-        // Fallback: copy to clipboard
-        navigator.clipboard.writeText(text).then(() => {
-            showToast('📋 Không tải được file. Đã copy toàn bộ nội dung vào clipboard — dán vào ứng dụng khác để lưu!', 'info');
-        }).catch(() => {
-            showToast('❌ Không thể tải file trên thiết bị này. Dùng nút Copy.', 'error');
-        });
-    }
+    downloadTextFile(text, fileName);
 }
 
 // ============================================
