@@ -80,17 +80,25 @@ function downloadResult() {
         showToast('Không có nội dung để tải!', 'warning');
         return;
     }
-    // Tên file: [tên_truyện]_translated.txt
-    const baseName = originalFileName.replace(/\.txt$/i, '').replace(/_translated$/, '');
-    const fileName = `${baseName}_translated.txt`;
-    downloadTextFile(text, fileName);
+
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = originalFileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    showToast('Đã tải file thành công!', 'success');
 }
 
 // Download partial - tải phần đã dịch được
 function downloadPartial() {
-    // Giữ đúng thứ tự, chỉ lấy chunks đã dịch
     const translatedParts = translatedChunks
-        .filter(c => c !== null && c !== undefined);
+        .map((c, i) => c !== null && c !== undefined ? c : `[⏳ Chunk ${i + 1} chưa dịch]`)
+        .filter((c, i) => translatedChunks[i] !== null && translatedChunks[i] !== undefined);
 
     if (translatedParts.length === 0) {
         showToast('Chưa có nội dung nào được dịch!', 'warning');
@@ -98,93 +106,22 @@ function downloadPartial() {
     }
 
     const text = translatedParts.join('\n\n');
-    // Tên file: [tên_truyện]_50of200chunks.txt
-    const baseName = originalFileName.replace(/\.txt$/i, '').replace(/_translated$/, '');
-    const fileName = `${baseName}_${completedChunks}of${totalChunksCount}chunks.txt`;
-    downloadTextFile(text, fileName);
+    const partialFileName = originalFileName.replace('.txt', `_partial_${completedChunks}chunks.txt`);
+
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = partialFileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    showToast(`Đã tải ${completedChunks} chunks đã dịch!`, 'success');
 }
 
-// Shared download helper — Capacitor Filesystem > Share API > Blob
-async function downloadTextFile(text, fileName) {
-    // TIER 1: Capacitor Filesystem (Android native — writes to Downloads/NovelTranslator/)
-    if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem) {
-        try {
-            const { Filesystem } = window.Capacitor.Plugins;
-            // Directory enum: 0=Documents, 1=Data, 2=Library, 3=Cache, 4=External, 5=ExternalStorage
-            // Use ExternalStorage for Downloads access, or Documents as fallback
-            
-            // Try to create subfolder
-            const subDir = 'NovelTranslator';
-            try {
-                await Filesystem.mkdir({
-                    path: subDir,
-                    directory: 'DOCUMENTS',
-                    recursive: true
-                });
-            } catch (mkdirErr) {
-                // Folder may already exist — that's OK
-            }
 
-            const filePath = `${subDir}/${fileName}`;
-            await Filesystem.writeFile({
-                path: filePath,
-                data: text,
-                directory: 'DOCUMENTS',
-                encoding: 'utf8'
-            });
-
-            showToast(`💾 Đã lưu: Documents/${filePath}`, 'success');
-            console.log(`[Download] Saved to Documents/${filePath}`);
-            return;
-        } catch (fsError) {
-            console.warn('[Download] Filesystem write failed:', fsError);
-            // Fall through to Share API
-        }
-    }
-
-    // TIER 2: Web Share API (Android share sheet)
-    if (navigator.share && navigator.canShare) {
-        try {
-            const file = new File([text], fileName, { type: 'text/plain' });
-            if (navigator.canShare({ files: [file] })) {
-                await navigator.share({ title: fileName, files: [file] });
-                showToast(`💾 File "${fileName}" đã được chia sẻ/lưu!`, 'success');
-                return;
-            }
-        } catch (shareErr) {
-            if (shareErr.name !== 'AbortError') {
-                console.warn('[Download] Share failed:', shareErr);
-            }
-        }
-    }
-
-    // TIER 3: Blob download (desktop browsers)
-    try {
-        const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = fileName;
-        a.style.display = 'none';
-        document.body.appendChild(a);
-        a.click();
-        setTimeout(() => {
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        }, 1000);
-        showToast(`💾 Đang tải "${fileName}"`, 'success');
-    } catch (e) {
-        // TIER 4: Copy clipboard
-        try {
-            await navigator.clipboard.writeText(text);
-            showToast('📋 Không tải được file. Đã copy nội dung vào clipboard!', 'info');
-        } catch (clipErr) {
-            const ta = document.getElementById('translatedText');
-            if (ta) { ta.value = text; ta.select(); }
-            showToast('⚠️ Hãy chọn text trong ô kết quả và copy thủ công.', 'warning');
-        }
-    }
-}
 
 // ============================================
 // TOAST NOTIFICATIONS

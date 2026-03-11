@@ -64,20 +64,16 @@ function processFile(file) {
 }
 
 function showFileInfo(file) {
-    const fileInfoEl = document.getElementById('fileInfo');
-    if (!fileInfoEl) return; // Mobile doesn't have this element
-    fileInfoEl.style.display = 'flex';
+    document.getElementById('fileInfo').style.display = 'flex';
     document.getElementById('fileName').textContent = file.name;
     document.getElementById('fileSize').textContent = formatFileSize(file.size);
 }
 
 function clearFile() {
-    const fileInput = document.getElementById('fileInput');
-    if (fileInput) fileInput.value = '';
-    const fileInfoEl = document.getElementById('fileInfo');
-    if (fileInfoEl) fileInfoEl.style.display = 'none';
+    document.getElementById('fileInput').value = '';
+    document.getElementById('fileInfo').style.display = 'none';
     document.getElementById('originalText').value = '';
-    if (typeof updateStats === 'function') updateStats();
+    updateStats();
 }
 
 function formatFileSize(bytes) {

@@ -24,24 +24,24 @@ function saveHistory() {
             translationHistory = translationHistory.slice(-20);
         }
 
-        const lightHistory = translationHistory.map(item => ({
+        // Lưu full text — chỉ bỏ chunks array để tiết kiệm
+        const saveData = translationHistory.map(item => ({
             ...item,
-            originalText: item.originalText ? item.originalText.substring(0, 500) + (item.originalText.length > 500 ? '...' : '') : '',
-            translatedText: item.translatedText ? item.translatedText.substring(0, 500) + (item.translatedText.length > 500 ? '...' : '') : '',
-            chunks: []
+            chunks: [] // Chunks array quá lớn, không lưu
         }));
 
-        localStorage.setItem('novelTranslatorHistory', JSON.stringify(lightHistory));
+        localStorage.setItem('novelTranslatorHistory', JSON.stringify(saveData));
     } catch (e) {
         console.error('Error saving history:', e);
 
         if (e.name === 'QuotaExceededError') {
+            // Nếu đầy, cắt bớt text để vừa
             translationHistory = translationHistory.slice(-5);
             try {
                 const lightHistory = translationHistory.map(item => ({
                     ...item,
-                    originalText: item.originalText ? item.originalText.substring(0, 200) : '',
-                    translatedText: item.translatedText ? item.translatedText.substring(0, 200) : '',
+                    originalText: item.originalText ? item.originalText.substring(0, 2000) : '',
+                    translatedText: item.translatedText ? item.translatedText.substring(0, 2000) : '',
                     chunks: []
                 }));
                 localStorage.setItem('novelTranslatorHistory', JSON.stringify(lightHistory));
@@ -102,9 +102,10 @@ function updateHistoryProgress(id, translatedText, chunks, completedCount) {
 
 function renderHistoryList() {
     const container = document.getElementById('historyList');
+    if (!container) return; // Mobile might not have this element
     const countBadge = document.getElementById('historyCount');
 
-    countBadge.textContent = `${translationHistory.length} bản`;
+    if (countBadge) countBadge.textContent = `${translationHistory.length} bản`;
 
     if (translationHistory.length === 0) {
         container.innerHTML = '<p class="empty-message">Chưa có lịch sử dịch nào.</p>';
