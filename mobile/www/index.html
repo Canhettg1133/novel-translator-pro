@@ -41,6 +41,18 @@
             <span class="status-item status-ready" id="statusReady">🟢 Sẵn sàng</span>
         </div>
 
+        <!-- File Upload -->
+        <div class="file-upload-mobile">
+            <button class="btn-file-upload" onclick="document.getElementById('fileInput').click()">
+                📁 Tải file .txt
+            </button>
+            <input type="file" id="fileInput" accept=".txt" hidden onchange="handleMobileFile(event)">
+            <div class="file-info-mobile" id="mFileInfo" style="display:none;">
+                <span id="mFileName">file.txt</span>
+                <button class="btn-icon" onclick="clearMobileFile()">✕</button>
+            </div>
+        </div>
+
         <!-- Text Input -->
         <div class="input-section">
             <div class="input-header">
@@ -48,7 +60,7 @@
                 <button class="btn-icon" onclick="document.getElementById('originalText').value=''; updateMobileStats();" title="Xóa">🗑️</button>
             </div>
             <textarea id="originalText" class="mobile-textarea"
-                placeholder="Dán nội dung tiểu thuyết cần dịch vào đây...&#10;&#10;Hỗ trợ: Tiếng Trung, Tiếng Anh, Tiếng Nhật..."
+                placeholder="Dán nội dung tiểu thuyết cần dịch vào đây...&#10;&#10;Hoặc bấm 📁 Tải file .txt ở trên."
                 oninput="updateMobileStats()"></textarea>
         </div>
 
@@ -73,10 +85,17 @@
         <!-- Source language -->
         <div class="lang-bar">
             <select id="sourceLang" class="lang-select" onchange="saveSettings()">
-                <option value="chinese">🇨🇳 Tiếng Trung</option>
-                <option value="english">🇺🇸 Tiếng Anh</option>
-                <option value="japanese">🇯🇵 Tiếng Nhật</option>
-                <option value="korean">🇰🇷 Tiếng Hàn</option>
+                <option value="auto">🔍 Tự động phát hiện</option>
+                <option value="zh-CN" selected>🇨🇳 Tiếng Trung (Giản thể)</option>
+                <option value="zh-TW">🇹🇼 Tiếng Trung (Phồn thể)</option>
+                <option value="en">🇬🇧 Tiếng Anh</option>
+                <option value="ja">🇯🇵 Tiếng Nhật</option>
+                <option value="ko">🇰🇷 Tiếng Hàn</option>
+                <option value="th">🇹🇭 Tiếng Thái</option>
+                <option value="id">🇮🇩 Tiếng Indonesia</option>
+                <option value="ru">🇷🇺 Tiếng Nga</option>
+                <option value="fr">🇫🇷 Tiếng Pháp</option>
+                <option value="es">🇪🇸 Tiếng Tây Ban Nha</option>
             </select>
             <span class="lang-arrow">→</span>
             <span class="lang-target">🇻🇳 Tiếng Việt</span>
@@ -130,6 +149,9 @@
         <div class="progress-controls">
             <button class="btn-control btn-pause" id="btnPause" onclick="togglePauseMobile()">
                 <span>⏸️</span> Tạm dừng
+            </button>
+            <button class="btn-control btn-cancel" style="background:rgba(16,185,129,0.15);color:var(--success);border:1px solid rgba(16,185,129,0.3);" onclick="downloadPartial()">
+                <span>📥</span> Tải phần đã dịch
             </button>
             <button class="btn-control btn-cancel" onclick="cancelMobileTranslation()">
                 <span>❌</span> Hủy
@@ -294,6 +316,7 @@
                         <button class="template-btn-mobile" onclick="setPromptTemplate('convert')">🔄 Convert</button>
                         <button class="template-btn-mobile" onclick="setPromptTemplate('novel')">📖 Tiểu thuyết</button>
                         <button class="template-btn-mobile" onclick="setPromptTemplate('adult')">🔞 18+</button>
+                        <button class="template-btn-mobile" onclick="setPromptTemplate('sacHiep')">🔥 Sắc Hiệp</button>
                         <button class="template-btn-mobile" onclick="setPromptTemplate('wuxia')">⚔️ Tu tiên</button>
                         <button class="template-btn-mobile" onclick="setPromptTemplate('romance')">💕 Ngôn tình</button>
                     </div>
@@ -327,6 +350,22 @@
                             <label>🤖 Model</label>
                             <input type="text" id="ollamaModel" placeholder="model-name">
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- History -->
+            <div class="drawer-section">
+                <div class="drawer-section-header" onclick="toggleDrawerSection('historySection')">
+                    <span>📜 Lịch sử dịch</span>
+                    <span class="badge" id="historyCount" style="font-size:0.7rem;">0</span>
+                    <span class="drawer-arrow" id="historySectionArrow">▶</span>
+                </div>
+                <div class="drawer-section-body" id="historySection" style="display:none;">
+                    <div id="historyList" style="max-height:200px;overflow-y:auto;"></div>
+                    <div style="display:flex;gap:6px;margin-top:8px;">
+                        <button class="btn btn-secondary btn-small" onclick="exportHistory()" style="flex:1">📤 Export</button>
+                        <button class="btn btn-danger btn-small" onclick="clearAllHistory()" style="flex:1">🗑️ Xóa hết</button>
                     </div>
                 </div>
             </div>

@@ -405,6 +405,31 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 // ============================================
+// FILE UPLOAD
+// ============================================
+function handleMobileFile(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        document.getElementById('originalText').value = e.target.result;
+        document.getElementById('mFileName').textContent = `${file.name} (${(file.size / 1024).toFixed(1)}KB)`;
+        document.getElementById('mFileInfo').style.display = 'flex';
+        updateMobileStats();
+        showToast(`📁 Đã tải: ${file.name}`, 'success');
+    };
+    reader.readAsText(file, 'UTF-8');
+}
+
+function clearMobileFile() {
+    document.getElementById('fileInput').value = '';
+    document.getElementById('mFileInfo').style.display = 'none';
+    document.getElementById('originalText').value = '';
+    updateMobileStats();
+}
+
+// ============================================
 // EXPOSE MOBILE FUNCTIONS GLOBALLY
 // ============================================
 window.showScreen = showScreen;
@@ -417,3 +442,5 @@ window.togglePauseMobile = togglePauseMobile;
 window.cancelMobileTranslation = cancelMobileTranslation;
 window.toggleMobileChunkList = toggleMobileChunkList;
 window.updateMobileStats = updateMobileStats;
+window.handleMobileFile = handleMobileFile;
+window.clearMobileFile = clearMobileFile;
