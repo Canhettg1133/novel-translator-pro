@@ -1,0 +1,740 @@
+/* ============================================
+   NOVEL TRANSLATOR PRO - MOBILE CSS
+   Flow: Input → Progress → Result + Settings Drawer
+   ============================================ */
+
+/* ============================================
+   BASE MOBILE RESET
+   ============================================ */
+.mobile-app {
+    overflow: hidden;
+    height: 100vh;
+    height: 100dvh;
+    position: relative;
+}
+
+.mobile-screen {
+    display: none;
+    flex-direction: column;
+    height: calc(100dvh - 56px);
+    padding: 12px 16px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: env(safe-area-inset-bottom, 16px);
+}
+
+.mobile-screen.active {
+    display: flex;
+}
+
+/* ============================================
+   HEADER
+   ============================================ */
+.mobile-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 56px;
+    padding: 0 16px;
+    background: rgba(15, 15, 35, 0.95);
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid rgba(99, 102, 241, 0.15);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    padding-top: env(safe-area-inset-top, 0);
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.app-logo {
+    font-size: 1.5rem;
+}
+
+.app-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, #6366f1, #a78bfa);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin: 0;
+}
+
+.header-btn {
+    background: rgba(99, 102, 241, 0.15);
+    border: none;
+    border-radius: 12px;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 1.2rem;
+    transition: all 0.2s;
+}
+
+.header-btn:active {
+    transform: scale(0.9);
+    background: rgba(99, 102, 241, 0.3);
+}
+
+/* ============================================
+   STATUS BAR
+   ============================================ */
+.status-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 8px 16px;
+    font-size: 0.8rem;
+    margin-bottom: 12px;
+    border-radius: 12px;
+}
+
+.status-item {
+    color: var(--text-secondary);
+}
+
+.status-divider {
+    color: rgba(255, 255, 255, 0.15);
+}
+
+.status-ready {
+    color: var(--success);
+}
+
+/* ============================================
+   INPUT SECTION
+   ============================================ */
+.input-section {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.input-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.input-header label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.btn-icon {
+    background: none;
+    border: none;
+    font-size: 1.1rem;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 8px;
+    transition: background 0.2s;
+}
+
+.btn-icon:active {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.mobile-textarea {
+    flex: 1;
+    width: 100%;
+    min-height: 120px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 14px;
+    color: var(--text-primary);
+    font-size: 15px;
+    line-height: 1.7;
+    resize: none;
+    font-family: 'Inter', sans-serif;
+    -webkit-overflow-scrolling: touch;
+}
+
+.mobile-textarea:focus {
+    border-color: var(--accent-primary);
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
+.mobile-textarea::placeholder {
+    color: rgba(255, 255, 255, 0.25);
+}
+
+/* ============================================
+   STATS BAR
+   ============================================ */
+.stats-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    padding: 10px 16px;
+    margin: 12px 0;
+    border-radius: 12px;
+}
+
+.stat-item {
+    text-align: center;
+}
+
+.stat-value {
+    display: block;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    font-family: 'SF Mono', 'Consolas', monospace;
+}
+
+.stat-label {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.stat-divider {
+    width: 1px;
+    height: 28px;
+    background: var(--border-color);
+}
+
+/* ============================================
+   LANGUAGE BAR
+   ============================================ */
+.lang-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.lang-select {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 8px 12px;
+    color: var(--text-primary);
+    font-size: 14px;
+}
+
+.lang-arrow {
+    font-size: 1.2rem;
+    color: var(--accent-primary);
+}
+
+.lang-target {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+/* ============================================
+   TRANSLATE BUTTON
+   ============================================ */
+.btn-translate {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    padding: 16px;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    border: none;
+    border-radius: 16px;
+    color: white;
+    font-size: 1.1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 4px 20px rgba(99, 102, 241, 0.4);
+    margin-bottom: 12px;
+}
+
+.btn-translate:active {
+    transform: scale(0.97);
+    box-shadow: 0 2px 10px rgba(99, 102, 241, 0.3);
+}
+
+.btn-translate:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.btn-translate-icon {
+    font-size: 1.3rem;
+}
+
+/* ============================================
+   PROGRESS SCREEN
+   ============================================ */
+.progress-circle-wrap {
+    display: flex;
+    justify-content: center;
+    padding: 20px 0;
+}
+
+.progress-circle {
+    position: relative;
+    width: 160px;
+    height: 160px;
+}
+
+.progress-circle svg {
+    width: 100%;
+    height: 100%;
+    transform: rotate(-90deg);
+}
+
+.progress-bg {
+    fill: none;
+    stroke: rgba(99, 102, 241, 0.1);
+    stroke-width: 6;
+}
+
+.progress-fill {
+    fill: none;
+    stroke: url(#progressGradient);
+    stroke: #6366f1;
+    stroke-width: 6;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 0.5s ease;
+}
+
+.progress-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+}
+
+.progress-percent {
+    display: block;
+    font-size: 2.2rem;
+    font-weight: 800;
+    color: var(--text-primary);
+    line-height: 1;
+}
+
+.progress-detail {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-top: 4px;
+}
+
+/* Speed bar */
+.speed-bar {
+    text-align: center;
+    padding: 8px;
+    border-radius: 10px;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+}
+
+/* Chunk tracker mobile */
+.chunk-tracker-mobile {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 12px;
+}
+
+.ct-mobile-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.ct-mobile-badge {
+    font-size: 0.75rem;
+    padding: 2px 8px;
+    border-radius: 20px;
+    background: rgba(99, 102, 241, 0.2);
+    color: var(--text-accent);
+}
+
+.ct-mobile-list {
+    flex: 1;
+    overflow-y: auto;
+    max-height: 200px;
+    -webkit-overflow-scrolling: touch;
+}
+
+.ct-mobile-summary {
+    padding: 8px 14px;
+    border-top: 1px solid var(--border-color);
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+/* Progress controls */
+.progress-controls {
+    display: flex;
+    gap: 12px;
+}
+
+.btn-control {
+    flex: 1;
+    padding: 14px;
+    border: none;
+    border-radius: 14px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: all 0.2s;
+}
+
+.btn-control:active {
+    transform: scale(0.96);
+}
+
+.btn-pause {
+    background: rgba(245, 158, 11, 0.15);
+    color: var(--warning);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.btn-cancel {
+    background: rgba(239, 68, 68, 0.15);
+    color: var(--danger);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+/* ============================================
+   RESULT SCREEN
+   ============================================ */
+.result-summary {
+    padding: 16px;
+    border-radius: 14px;
+    margin-bottom: 12px;
+    text-align: center;
+}
+
+.result-status {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--success);
+    margin-bottom: 8px;
+}
+
+.result-stats {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 12px;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.result-text-section {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    margin-bottom: 12px;
+}
+
+.result-text-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.result-text-header label {
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.result-text-count {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.result-textarea {
+    background: rgba(16, 185, 129, 0.04);
+    border-color: rgba(16, 185, 129, 0.2);
+}
+
+/* Action buttons */
+.result-actions {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.btn-action {
+    flex: 1;
+    padding: 12px;
+    border: none;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: all 0.2s;
+}
+
+.btn-action:active {
+    transform: scale(0.95);
+}
+
+.btn-copy {
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: white;
+}
+
+.btn-download {
+    background: rgba(16, 185, 129, 0.15);
+    color: var(--success);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.btn-new {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+}
+
+/* Failed chunks bar */
+.failed-chunks-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    border-radius: 10px;
+    background: rgba(245, 158, 11, 0.1);
+    border: 1px solid rgba(245, 158, 11, 0.2);
+    font-size: 0.85rem;
+    color: var(--warning);
+}
+
+/* ============================================
+   SETTINGS DRAWER
+   ============================================ */
+.settings-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 200;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+}
+
+.settings-overlay.open {
+    opacity: 1;
+    pointer-events: all;
+}
+
+.settings-drawer {
+    position: fixed;
+    top: 0;
+    right: -85vw;
+    width: 85vw;
+    max-width: 380px;
+    height: 100vh;
+    height: 100dvh;
+    background: rgba(15, 15, 35, 0.98);
+    backdrop-filter: blur(30px);
+    z-index: 201;
+    transition: right 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    display: flex;
+    flex-direction: column;
+    border-left: 1px solid rgba(99, 102, 241, 0.15);
+}
+
+.settings-drawer.open {
+    right: 0;
+}
+
+.drawer-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px;
+    border-bottom: 1px solid var(--border-color);
+    padding-top: calc(16px + env(safe-area-inset-top, 0));
+}
+
+.drawer-header h2 {
+    font-size: 1.1rem;
+    margin: 0;
+    color: var(--text-primary);
+}
+
+.drawer-content {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 8px 0;
+}
+
+/* Drawer sections */
+.drawer-section {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.drawer-section-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 16px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    transition: background 0.2s;
+}
+
+.drawer-section-header:active {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.drawer-section-header .badge {
+    margin-left: auto;
+    font-size: 0.7rem;
+}
+
+.drawer-arrow {
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    transition: transform 0.2s;
+}
+
+.drawer-arrow.open {
+    transform: rotate(90deg);
+}
+
+.drawer-section-body {
+    padding: 0 16px 16px;
+}
+
+.drawer-toggle {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+    font-size: 0.85rem;
+}
+
+.form-group-mobile {
+    margin-bottom: 12px;
+}
+
+.form-group-mobile label {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+}
+
+.form-group-mobile input,
+.form-group-mobile select {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 10px 12px;
+    color: var(--text-primary);
+    font-size: 14px;
+}
+
+.form-group-mobile input:focus,
+.form-group-mobile select:focus {
+    border-color: var(--accent-primary);
+    outline: none;
+}
+
+/* Template buttons */
+.template-grid-mobile {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+    margin-bottom: 8px;
+}
+
+.template-btn-mobile {
+    padding: 8px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.template-btn-mobile:active {
+    background: rgba(99, 102, 241, 0.2);
+    border-color: var(--accent-primary);
+}
+
+.mobile-prompt-textarea {
+    width: 100%;
+    min-height: 80px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 10px;
+    color: var(--text-primary);
+    font-size: 13px;
+    line-height: 1.5;
+    resize: vertical;
+}
+
+/* ============================================
+   TOAST OVERRIDE FOR MOBILE
+   ============================================ */
+.toast-container {
+    bottom: 20px !important;
+    left: 16px !important;
+    right: 16px !important;
+    max-width: unset !important;
+}
+
+/* ============================================
+   ANIMATIONS
+   ============================================ */
+@keyframes pulseGlow {
+    0%, 100% { box-shadow: 0 4px 20px rgba(99, 102, 241, 0.3); }
+    50% { box-shadow: 0 4px 30px rgba(99, 102, 241, 0.5); }
+}
+
+.btn-translate.translating {
+    animation: pulseGlow 2s ease-in-out infinite;
+    background: linear-gradient(135deg, #f59e0b, #ef4444);
+}

@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#0f0f23">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Novel Translator Pro</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="mobile.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="mobile-app">
+
+    <!-- ============================================ -->
+    <!-- HEADER -->
+    <!-- ============================================ -->
+    <header class="mobile-header" id="mobileHeader">
+        <div class="header-left">
+            <span class="app-logo">📚</span>
+            <h1 class="app-title">Novel Translator</h1>
+        </div>
+        <div class="header-right">
+            <button class="header-btn" id="settingsBtn" onclick="toggleSettingsDrawer()">
+                <span>⚙️</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- ============================================ -->
+    <!-- SCREEN 1: INPUT (trang chính) -->
+    <!-- ============================================ -->
+    <main class="mobile-screen active" id="screenInput">
+        <!-- Status bar nhỏ gọn -->
+        <div class="status-bar glass-card" id="statusBar">
+            <span class="status-item" id="statusKeys">🔑 <span id="keyCountStatus">0 keys</span></span>
+            <span class="status-divider">•</span>
+            <span class="status-item" id="statusModel">⚡ <span id="modelStatus">Chưa chọn</span></span>
+            <span class="status-divider">•</span>
+            <span class="status-item status-ready" id="statusReady">🟢 Sẵn sàng</span>
+        </div>
+
+        <!-- Text Input -->
+        <div class="input-section">
+            <div class="input-header">
+                <label for="originalText">📝 Nội dung cần dịch</label>
+                <button class="btn-icon" onclick="document.getElementById('originalText').value=''; updateMobileStats();" title="Xóa">🗑️</button>
+            </div>
+            <textarea id="originalText" class="mobile-textarea"
+                placeholder="Dán nội dung tiểu thuyết cần dịch vào đây...&#10;&#10;Hỗ trợ: Tiếng Trung, Tiếng Anh, Tiếng Nhật..."
+                oninput="updateMobileStats()"></textarea>
+        </div>
+
+        <!-- Stats compact -->
+        <div class="stats-bar glass-card" id="statsBar">
+            <div class="stat-item">
+                <span class="stat-value" id="mCharCount">0</span>
+                <span class="stat-label">ký tự</span>
+            </div>
+            <div class="stat-divider"></div>
+            <div class="stat-item">
+                <span class="stat-value" id="mChunkCount">0</span>
+                <span class="stat-label">chunks</span>
+            </div>
+            <div class="stat-divider"></div>
+            <div class="stat-item">
+                <span class="stat-value" id="mEstTime">--</span>
+                <span class="stat-label">ước tính</span>
+            </div>
+        </div>
+
+        <!-- Source language -->
+        <div class="lang-bar">
+            <select id="sourceLang" class="lang-select" onchange="saveSettings()">
+                <option value="chinese">🇨🇳 Tiếng Trung</option>
+                <option value="english">🇺🇸 Tiếng Anh</option>
+                <option value="japanese">🇯🇵 Tiếng Nhật</option>
+                <option value="korean">🇰🇷 Tiếng Hàn</option>
+            </select>
+            <span class="lang-arrow">→</span>
+            <span class="lang-target">🇻🇳 Tiếng Việt</span>
+        </div>
+
+        <!-- Big translate button -->
+        <button class="btn-translate" id="btnTranslate" onclick="startMobileTranslation()">
+            <span class="btn-translate-icon">▶️</span>
+            <span class="btn-translate-text">BẮT ĐẦU DỊCH</span>
+        </button>
+    </main>
+
+    <!-- ============================================ -->
+    <!-- SCREEN 2: PROGRESS (khi đang dịch) -->
+    <!-- ============================================ -->
+    <main class="mobile-screen" id="screenProgress">
+        <!-- Circular progress -->
+        <div class="progress-circle-wrap">
+            <div class="progress-circle" id="progressCircle">
+                <svg viewBox="0 0 100 100">
+                    <circle class="progress-bg" cx="50" cy="50" r="42"></circle>
+                    <circle class="progress-fill" id="progressArc" cx="50" cy="50" r="42"
+                        stroke-dasharray="263.9" stroke-dashoffset="263.9"></circle>
+                </svg>
+                <div class="progress-text">
+                    <span class="progress-percent" id="mProgressPercent">0%</span>
+                    <span class="progress-detail" id="mProgressDetail">0/0 chunks</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Speed info -->
+        <div class="speed-bar glass-card">
+            <span id="mSpeedInfo">⏱️ Đang tính...</span>
+        </div>
+
+        <!-- Chunk tracker compact -->
+        <div class="chunk-tracker-mobile glass-card">
+            <div class="ct-mobile-header" onclick="toggleMobileChunkList()">
+                <span>📊 Chi tiết Chunks</span>
+                <span class="ct-mobile-badge" id="mChunkBadge">0/0</span>
+                <span class="ct-mobile-toggle" id="mChunkToggle">▼</span>
+            </div>
+            <div class="ct-mobile-list" id="mChunkList">
+                <!-- Chunk rows rendered here -->
+            </div>
+            <div class="ct-mobile-summary" id="mChunkSummary"></div>
+        </div>
+
+        <!-- Control buttons -->
+        <div class="progress-controls">
+            <button class="btn-control btn-pause" id="btnPause" onclick="togglePauseMobile()">
+                <span>⏸️</span> Tạm dừng
+            </button>
+            <button class="btn-control btn-cancel" onclick="cancelMobileTranslation()">
+                <span>❌</span> Hủy
+            </button>
+        </div>
+    </main>
+
+    <!-- ============================================ -->
+    <!-- SCREEN 3: RESULT (sau khi dịch xong) -->
+    <!-- ============================================ -->
+    <main class="mobile-screen" id="screenResult">
+        <!-- Summary stats -->
+        <div class="result-summary glass-card">
+            <div class="result-status" id="mResultStatus">✅ Hoàn thành!</div>
+            <div class="result-stats" id="mResultStats">
+                <span>📊 206/206</span>
+                <span>📏 89%</span>
+                <span>⏱️ 18 phút</span>
+                <span>🔄 3 retry</span>
+            </div>
+        </div>
+
+        <!-- Translated text -->
+        <div class="result-text-section">
+            <div class="result-text-header">
+                <label>📤 Kết quả dịch</label>
+                <span class="result-text-count" id="mResultCharCount">0 chữ</span>
+            </div>
+            <textarea id="translatedText" class="mobile-textarea result-textarea"
+                placeholder="Kết quả dịch sẽ hiện ở đây..."></textarea>
+        </div>
+
+        <!-- Action buttons -->
+        <div class="result-actions">
+            <button class="btn-action btn-copy" onclick="copyMobileResult()">
+                <span>📋</span> Copy
+            </button>
+            <button class="btn-action btn-download" onclick="downloadMobileResult()">
+                <span>💾</span> Tải file
+            </button>
+            <button class="btn-action btn-new" onclick="showScreen('screenInput')">
+                <span>🔄</span> Dịch mới
+            </button>
+        </div>
+
+        <!-- Failed chunks warning -->
+        <div class="failed-chunks-bar glass-card" id="mFailedChunksBar" style="display:none;">
+            <span>⚠️ <span id="mFailedCount">0</span> chunk lỗi/ngắn</span>
+            <button class="btn-small btn-warning" onclick="retranslateAllFailed()">🔄 Dịch lại</button>
+        </div>
+    </main>
+
+    <!-- ============================================ -->
+    <!-- SETTINGS DRAWER (slide từ phải) -->
+    <!-- ============================================ -->
+    <div class="settings-overlay" id="settingsOverlay" onclick="toggleSettingsDrawer()"></div>
+    <aside class="settings-drawer" id="settingsDrawer">
+        <div class="drawer-header">
+            <h2>⚙️ Cài đặt</h2>
+            <button class="btn-icon" onclick="toggleSettingsDrawer()">✕</button>
+        </div>
+
+        <div class="drawer-content">
+            <!-- Proxy Settings -->
+            <div class="drawer-section">
+                <div class="drawer-section-header" onclick="toggleDrawerSection('proxySection')">
+                    <span>🌐 Proxy API</span>
+                    <span class="badge ollama-badge" id="proxyStatus">Tắt</span>
+                    <span class="drawer-arrow" id="proxySectionArrow">▶</span>
+                </div>
+                <div class="drawer-section-body" id="proxySection" style="display:none;">
+                    <div class="drawer-toggle">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="useProxyToggle" onchange="toggleProxyMode()">
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <span>Bật Proxy API</span>
+                    </div>
+
+                    <div class="proxy-settings" id="proxySettings" style="display:none;">
+                        <div class="form-group-mobile">
+                            <label>🔗 Base URL</label>
+                            <input type="text" id="proxyBaseUrlInput"
+                                value="https://ag.beijixingxing.com/v1/chat/completions"
+                                onchange="updateProxyConfig()">
+                        </div>
+
+                        <div class="form-group-mobile">
+                            <label>🔑 API Keys <span class="badge" id="proxyKeyCount" style="font-size:0.7rem">0</span></label>
+                            <div id="proxyKeysList"></div>
+                            <div style="display:flex;gap:6px;margin-top:6px;">
+                                <input type="password" id="newProxyKeyInput" placeholder="sk-..."
+                                    style="flex:1;font-size:14px;" onkeypress="if(event.key==='Enter')addProxyKey()">
+                                <button class="btn btn-primary btn-small" onclick="addProxyKey()">➕</button>
+                            </div>
+                        </div>
+
+                        <div class="form-group-mobile">
+                            <label>🤖 Model</label>
+                            <select id="proxyModelSelect" onchange="selectProxyModel()" style="font-size:14px;"></select>
+                        </div>
+
+                        <button class="btn btn-primary btn-small" onclick="testProxyConnection()" style="width:100%">
+                            🧪 Test kết nối
+                        </button>
+                        <div id="proxyTestResult" style="margin-top:8px;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Gemini Direct -->
+            <div class="drawer-section">
+                <div class="drawer-section-header" onclick="toggleDrawerSection('geminiSection')">
+                    <span>🔑 Gemini API Keys</span>
+                    <span class="drawer-arrow" id="geminiSectionArrow">▶</span>
+                </div>
+                <div class="drawer-section-body" id="geminiSection" style="display:none;">
+                    <div class="form-group-mobile">
+                        <div id="apiKeysList"></div>
+                        <div style="display:flex;gap:6px;margin-top:6px;">
+                            <input type="password" id="newApiKey" placeholder="AIza..."
+                                style="flex:1;font-size:14px;" onkeypress="if(event.key==='Enter')addApiKey()">
+                            <button class="btn btn-primary btn-small" onclick="addApiKey()">➕</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Translation Settings -->
+            <div class="drawer-section">
+                <div class="drawer-section-header" onclick="toggleDrawerSection('transSection')">
+                    <span>📐 Cài đặt dịch</span>
+                    <span class="drawer-arrow" id="transSectionArrow">▶</span>
+                </div>
+                <div class="drawer-section-body" id="transSection" style="display:none;">
+                    <div class="form-group-mobile">
+                        <label>⚡ Parallel</label>
+                        <input type="number" id="parallelCount" value="5" min="1" max="20"
+                            onchange="updateMobileStats(); saveSettings()">
+                    </div>
+                    <div class="form-group-mobile">
+                        <label>📏 Chunk size (ký tự)</label>
+                        <input type="number" id="chunkSize" value="4500" min="500" max="10000"
+                            onchange="updateMobileStats(); saveSettings()">
+                    </div>
+                    <div class="form-group-mobile">
+                        <label>⏱️ Delay (ms)</label>
+                        <input type="number" id="delayMs" value="100" min="0" max="30000"
+                            onchange="saveSettings()">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Prompt Template -->
+            <div class="drawer-section">
+                <div class="drawer-section-header" onclick="toggleDrawerSection('promptSection')">
+                    <span>📝 Prompt Template</span>
+                    <span class="drawer-arrow" id="promptSectionArrow">▶</span>
+                </div>
+                <div class="drawer-section-body" id="promptSection" style="display:none;">
+                    <div class="template-grid-mobile">
+                        <button class="template-btn-mobile" onclick="setPromptTemplate('convert')">🔄 Convert</button>
+                        <button class="template-btn-mobile" onclick="setPromptTemplate('novel')">📖 Tiểu thuyết</button>
+                        <button class="template-btn-mobile" onclick="setPromptTemplate('adult')">🔞 18+</button>
+                        <button class="template-btn-mobile" onclick="setPromptTemplate('wuxia')">⚔️ Tu tiên</button>
+                        <button class="template-btn-mobile" onclick="setPromptTemplate('romance')">💕 Ngôn tình</button>
+                    </div>
+                    <textarea id="customPrompt" class="mobile-prompt-textarea"
+                        placeholder="Nhập prompt tùy chỉnh..." rows="4"></textarea>
+                </div>
+            </div>
+
+            <!-- Ollama -->
+            <div class="drawer-section">
+                <div class="drawer-section-header" onclick="toggleDrawerSection('ollamaSection')">
+                    <span>🦙 Ollama Local AI</span>
+                    <span class="badge ollama-badge" id="ollamaStatus">Tắt</span>
+                    <span class="drawer-arrow" id="ollamaSectionArrow">▶</span>
+                </div>
+                <div class="drawer-section-body" id="ollamaSection" style="display:none;">
+                    <div class="drawer-toggle">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="useOllamaToggle" onchange="toggleOllamaMode()">
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <span>Bật Ollama</span>
+                    </div>
+                    <div id="ollamaSettings" style="display:none;">
+                        <div class="form-group-mobile">
+                            <label>🔗 URL</label>
+                            <input type="text" id="ollamaUrl" value="http://localhost:11434"
+                                onchange="saveOllamaSettings()">
+                        </div>
+                        <div class="form-group-mobile">
+                            <label>🤖 Model</label>
+                            <input type="text" id="ollamaModel" placeholder="model-name">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- ============================================ -->
+    <!-- CHUNK DETAIL MODAL -->
+    <!-- ============================================ -->
+    <div class="chunk-detail-modal" id="chunkDetailModal" style="display:none;">
+        <div class="chunk-detail-modal-content glass-card" id="chunkDetailContent">
+        </div>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- HIDDEN ELEMENTS (needed by engine.js) -->
+    <!-- ============================================ -->
+    <div style="display:none;">
+        <div id="progressSection"></div>
+        <div id="resultSection"></div>
+        <div id="progressBar"></div>
+        <div id="progressText"></div>
+        <div id="progressStats"></div>
+        <div id="charCount"></div>
+        <div id="chunkCount"></div>
+        <div id="estimatedTime"></div>
+        <div id="chunkTrackerPanel" style="display:none;">
+            <div id="chunkTrackerBody">
+                <div id="chunkTrackerList"></div>
+                <div id="chunkTrackerSummary"></div>
+            </div>
+            <span id="chunkTrackerBadge"></span>
+            <span id="chunkTrackerToggle"></span>
+        </div>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- TOAST CONTAINER -->
+    <!-- ============================================ -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- ============================================ -->
+    <!-- SCRIPTS (same order as web version) -->
+    <!-- ============================================ -->
+    <script src="js/app.js"></script>
+    <script src="js/gemini/api.js"></script>
+    <script src="js/gemini/quota.js"></script>
+    <script src="js/translation/chunker.js"></script>
+    <script src="js/translation/engine.js"></script>
+    <script src="js/translation/retry.js"></script>
+    <script src="js/proxy/proxy-api.js"></script>
+    <script src="js/local-ai/ollama.js"></script>
+    <script src="js/ui/settings.js"></script>
+    <script src="js/ui/progress.js"></script>
+    <script src="js/ui/controls.js"></script>
+    <script src="js/ui/chunk-tracker.js"></script>
+    <script src="js/ui/history.js"></script>
+    <script src="js/ui/rpd-tracker.js"></script>
+    <script src="js/init.js"></script>
+    <script src="mobile.js"></script>
+</body>
+</html>

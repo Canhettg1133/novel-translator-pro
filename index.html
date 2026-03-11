@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="vi">
 
 <head>
@@ -199,13 +199,20 @@
                         <small class="hint">Endpoint OpenAI-compatible (kết thúc /chat/completions)</small>
                     </div>
 
+                    <!-- Multi Proxy Keys -->
                     <div class="form-group">
-                        <label for="proxyApiKeyInput">
+                        <label>
                             <span class="icon">🔑</span>
-                            Proxy API Key
+                            Proxy API Keys
+                            <span class="badge" id="proxyKeyCount" style="font-size:0.75rem;">0 keys</span>
                         </label>
-                        <input type="password" id="proxyApiKeyInput" placeholder="sk-..."
-                            onchange="updateProxyConfig()">
+                        <div id="proxyKeysList"></div>
+                        <div class="input-group" style="display:flex;gap:8px;margin-top:8px;">
+                            <input type="password" id="newProxyKeyInput" placeholder="sk-..." style="flex:1;"
+                                onkeypress="if(event.key==='Enter')addProxyKey()">
+                            <button class="btn btn-primary btn-small" onclick="addProxyKey()">➕ Thêm</button>
+                        </div>
+                        <small class="hint">Mỗi key thêm ~5 RPM. 2 keys = dịch nhanh gấp đôi (parallel x2)</small>
                     </div>
 
                     <div class="form-group">
@@ -246,8 +253,8 @@
                     <div class="ollama-tips">
                         <p>💡 <strong>Mẹo dùng Proxy:</strong></p>
                         <ul>
-                            <li>Request song song: <strong>1-2</strong> (proxy có RPM thấp ~5/phút)</li>
-                            <li>Delay: <strong>3000-5000ms</strong> (tránh rate limit)</li>
+                            <li>1 key = parallel 1 (~7 RPM) | 2 keys = parallel 2 (~14 RPM)</li>
+                            <li>Delay: <strong>5000ms</strong> tự động (tránh rate limit 5 RPM/key)</li>
                             <li>Chunk size: <strong>2000-3000</strong> ký tự</li>
                             <li>Khi bật Proxy, hệ thống sẽ <strong>bỏ qua</strong> Gemini Direct</li>
                         </ul>
@@ -628,6 +635,28 @@
                 </div>
             </section>
 
+            <!-- Chunk Tracker Panel -->
+            <section class="chunk-tracker-panel glass-card" id="chunkTrackerPanel" style="display: none;">
+                <div class="chunk-tracker-header" onclick="toggleChunkTracker()">
+                    <h2 class="section-title">
+                        <span class="icon">📊</span>
+                        Chi tiết Chunks
+                        <span class="ct-badge" id="chunkTrackerBadge"></span>
+                    </h2>
+                    <span class="ct-toggle" id="chunkTrackerToggle">▼</span>
+                </div>
+                <div id="chunkTrackerBody">
+                    <div class="ct-list" id="chunkTrackerList"></div>
+                    <div class="ct-summary" id="chunkTrackerSummary"></div>
+                </div>
+            </section>
+
+            <!-- Chunk Detail Modal -->
+            <div class="chunk-detail-modal" id="chunkDetailModal" style="display: none;">
+                <div class="chunk-detail-modal-content glass-card" id="chunkDetailContent">
+                </div>
+            </div>
+
             <!-- Result Section -->
             <section class="result-section glass-card" id="resultSection" style="display: none;">
                 <div class="result-header">
@@ -683,6 +712,7 @@
     <script src="js/ui/file-handler.js"></script>
     <script src="js/ui/settings.js"></script>
     <script src="js/ui/controls.js"></script>
+    <script src="js/ui/chunk-tracker.js"></script>
 
     <!-- 5. History -->
     <script src="js/history/history.js"></script>

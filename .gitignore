@@ -6,6 +6,19 @@ electron-app/dist/
 # Build output
 dist/
 
+# Mobile app build
+mobile/android/
+mobile/node_modules/
+mobile/.gradle/
+ai-chat-mobile/
+
+# AI Chat (separate project)
+ai-chat/
+
+# Proxy extension (separate)
+sangtacviet-proxy-extension/
+sangtacviet-proxy-redirect.user.js
+
 # Backups
 *.bak
 js_modules_backup/

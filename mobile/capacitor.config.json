@@ -1,0 +1,20 @@
+{
+  "appId": "com.noveltranslator.pro",
+  "appName": "Novel Translator Pro",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 2000,
+      "backgroundColor": "#0f0f23",
+      "showSpinner": true,
+      "spinnerColor": "#6366f1"
+    }
+  },
+  "android": {
+    "allowMixedContent": true,
+    "backgroundColor": "#0f0f23"
+  }
+}
