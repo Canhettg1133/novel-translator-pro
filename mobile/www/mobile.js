@@ -206,34 +206,84 @@ function syncChunkTrackerToMobile() {
     const summary = document.getElementById('mChunkSummary');
     if (!list) return;
 
-    // Only render last 20 chunks for performance
-    const startIdx = Math.max(0, chunkTrackingData.length - 20);
-    const visibleChunks = chunkTrackingData.slice(startIdx);
-
-    list.innerHTML = visibleChunks.map(data => {
+    // Render ALL chunks
+    list.innerHTML = chunkTrackingData.map(data => {
         const statusInfo = typeof getStatusInfo === 'function' ? getStatusInfo(data.status) : { icon: '?', label: data.status };
         const keyBadge = data.keyLabel ? `<span class="ct-key">🔑${data.keyLabel}</span>` : '';
+        const retryBtn = (data.status === 'failed' || data.status === 'warning')
+            ? `<button class="ct-retry-btn" onclick="event.stopPropagation(); retranslateChunk(${data.index})">🔄</button>`
+            : '';
         return `
-            <div class="ct-row ct-${data.status}" onclick="viewChunkDetail(${data.index})">
+            <div class="ct-row ct-${data.status}" onclick="showMobileChunkDetail(${data.index})">
                 <span class="ct-num">#${data.index + 1}</span>
                 <span class="ct-io">${data.inputLen.toLocaleString()}→${data.outputLen > 0 ? data.outputLen.toLocaleString() : '...'}</span>
                 <span class="ct-ratio ${data.ratio < 60 && data.ratio > 0 ? 'ratio-warning' : (data.ratio >= 60 ? 'ratio-ok' : '')}">${data.ratio > 0 ? data.ratio + '%' : '--'}</span>
                 <span class="ct-status">${statusInfo.icon}</span>
                 ${keyBadge}
+                ${retryBtn}
             </div>
         `;
     }).join('');
 
-    // Auto-scroll to bottom
-    list.scrollTop = list.scrollHeight;
+    // Auto-scroll to latest active chunk
+    const activeRow = list.querySelector('.ct-translating, .ct-pending');
+    if (activeRow) {
+        activeRow.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
 
     // Summary
     if (summary) {
         const success = chunkTrackingData.filter(d => d.status === 'success').length;
         const failed = chunkTrackingData.filter(d => d.status === 'failed' || d.status === 'warning').length;
         const total = chunkTrackingData.length;
-        summary.textContent = `✅ ${success} | ⚠️ ${failed} | 📊 ${total} chunks`;
+        summary.innerHTML = `✅ ${success} | ⚠️ ${failed} | 📊 ${total} chunks` +
+            (failed > 0 ? ` <button class="ct-retry-all-btn" onclick="retranslateAllFailed()">🔄 Dịch lại ${failed} lỗi</button>` : '');
     }
+}
+
+// ============================================
+// MOBILE CHUNK DETAIL MODAL
+// ============================================
+function showMobileChunkDetail(index) {
+    if (typeof chunkTrackingData === 'undefined' || !chunkTrackingData[index]) return;
+
+    const data = chunkTrackingData[index];
+    const statusInfo = typeof getStatusInfo === 'function' ? getStatusInfo(data.status) : { icon: '?', label: data.status };
+    const modal = document.getElementById('chunkDetailModal');
+    const content = document.getElementById('chunkDetailContent');
+
+    content.innerHTML = `
+        <div class="cmd-header">
+            <h3>Chunk #${index + 1} ${statusInfo.icon} ${statusInfo.label || ''}</h3>
+            <button class="btn-icon" onclick="closeMobileChunkDetail()">✕</button>
+        </div>
+        <div class="cmd-stats">
+            <span>📥 ${data.inputLen.toLocaleString()} chữ</span>
+            <span>📤 ${data.outputLen.toLocaleString()} chữ</span>
+            <span>📏 ${data.ratio}%</span>
+            <span>🔄 ${data.retryCount} retry</span>
+            ${data.keyLabel ? `<span>🔑 Key ${data.keyLabel}</span>` : ''}
+        </div>
+        <div class="cmd-section">
+            <label>📥 Nguyên văn:</label>
+            <div class="cmd-text">${(data.originalText || '').substring(0, 500)}${data.originalText && data.originalText.length > 500 ? '...' : ''}</div>
+        </div>
+        <div class="cmd-section">
+            <label>📤 Bản dịch:</label>
+            <div class="cmd-text">${(data.translatedText || '[Chưa có]').substring(0, 500)}${data.translatedText && data.translatedText.length > 500 ? '...' : ''}</div>
+        </div>
+        ${data.error ? `<div class="cmd-section"><label>❌ Lỗi:</label><div class="cmd-text cmd-error">${data.error}</div></div>` : ''}
+        <div class="cmd-actions">
+            <button class="btn btn-primary btn-small" onclick="retranslateChunk(${index}); closeMobileChunkDetail();">🔄 Dịch lại chunk này</button>
+            <button class="btn btn-secondary btn-small" onclick="closeMobileChunkDetail()">Đóng</button>
+        </div>
+    `;
+
+    modal.style.display = 'flex';
+}
+
+function closeMobileChunkDetail() {
+    document.getElementById('chunkDetailModal').style.display = 'none';
 }
 
 // ============================================
@@ -480,3 +530,5 @@ window.updateMobileStats = updateMobileStats;
 window.handleMobileFile = handleMobileFile;
 window.clearMobileFile = clearMobileFile;
 window.pasteToField = pasteToField;
+window.showMobileChunkDetail = showMobileChunkDetail;
+window.closeMobileChunkDetail = closeMobileChunkDetail;
