@@ -366,7 +366,9 @@ function downloadMobileResult() {
         showToast('Chưa có kết quả!', 'warning');
         return;
     }
-    const fileName = `translated_${new Date().toISOString().slice(0, 10)}.txt`;
+    // Use novel name from originalFileName
+    const baseName = originalFileName.replace(/\.txt$/i, '').replace(/_translated$/, '');
+    const fileName = `${baseName}_translated.txt`;
     downloadTextFile(text, fileName);
 }
 

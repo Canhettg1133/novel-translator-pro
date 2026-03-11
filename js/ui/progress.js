@@ -80,7 +80,10 @@ function downloadResult() {
         showToast('Không có nội dung để tải!', 'warning');
         return;
     }
-    downloadTextFile(text, originalFileName);
+    // Tên file: [tên_truyện]_translated.txt
+    const baseName = originalFileName.replace(/\.txt$/i, '').replace(/_translated$/, '');
+    const fileName = `${baseName}_translated.txt`;
+    downloadTextFile(text, fileName);
 }
 
 // Download partial - tải phần đã dịch được
@@ -95,43 +98,67 @@ function downloadPartial() {
     }
 
     const text = translatedParts.join('\n\n');
-    const partialFileName = originalFileName.replace('.txt', `_partial_${completedChunks}chunks.txt`);
-    downloadTextFile(text, partialFileName);
-    showToast(`Đã tải ${completedChunks} chunks đã dịch!`, 'success');
+    // Tên file: [tên_truyện]_50of200chunks.txt
+    const baseName = originalFileName.replace(/\.txt$/i, '').replace(/_translated$/, '');
+    const fileName = `${baseName}_${completedChunks}of${totalChunksCount}chunks.txt`;
+    downloadTextFile(text, fileName);
 }
 
-// Shared download helper — 3-tier approach for maximum compatibility
-function downloadTextFile(text, fileName) {
-    // TIER 1: Web Share API (best for Android — opens native share sheet)
+// Shared download helper — Capacitor Filesystem > Share API > Blob
+async function downloadTextFile(text, fileName) {
+    // TIER 1: Capacitor Filesystem (Android native — writes to Downloads/NovelTranslator/)
+    if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem) {
+        try {
+            const { Filesystem } = window.Capacitor.Plugins;
+            // Directory enum: 0=Documents, 1=Data, 2=Library, 3=Cache, 4=External, 5=ExternalStorage
+            // Use ExternalStorage for Downloads access, or Documents as fallback
+            
+            // Try to create subfolder
+            const subDir = 'NovelTranslator';
+            try {
+                await Filesystem.mkdir({
+                    path: subDir,
+                    directory: 'DOCUMENTS',
+                    recursive: true
+                });
+            } catch (mkdirErr) {
+                // Folder may already exist — that's OK
+            }
+
+            const filePath = `${subDir}/${fileName}`;
+            await Filesystem.writeFile({
+                path: filePath,
+                data: text,
+                directory: 'DOCUMENTS',
+                encoding: 'utf8'
+            });
+
+            showToast(`💾 Đã lưu: Documents/${filePath}`, 'success');
+            console.log(`[Download] Saved to Documents/${filePath}`);
+            return;
+        } catch (fsError) {
+            console.warn('[Download] Filesystem write failed:', fsError);
+            // Fall through to Share API
+        }
+    }
+
+    // TIER 2: Web Share API (Android share sheet)
     if (navigator.share && navigator.canShare) {
         try {
             const file = new File([text], fileName, { type: 'text/plain' });
             if (navigator.canShare({ files: [file] })) {
-                navigator.share({
-                    title: fileName,
-                    files: [file]
-                }).then(() => {
-                    showToast(`💾 File "${fileName}" đã được chia sẻ/lưu!`, 'success');
-                }).catch(err => {
-                    // User cancelled share — that's OK
-                    if (err.name !== 'AbortError') {
-                        console.warn('[Download] Share failed, trying blob download:', err);
-                        downloadViaBlobLink(text, fileName);
-                    }
-                });
-                return; // Share dialog opened
+                await navigator.share({ title: fileName, files: [file] });
+                showToast(`💾 File "${fileName}" đã được chia sẻ/lưu!`, 'success');
+                return;
             }
-        } catch (e) {
-            console.warn('[Download] Share API error:', e);
+        } catch (shareErr) {
+            if (shareErr.name !== 'AbortError') {
+                console.warn('[Download] Share failed:', shareErr);
+            }
         }
     }
 
-    // TIER 2: Blob download (works on desktop browsers, sometimes works on Android)
-    downloadViaBlobLink(text, fileName);
-}
-
-// Blob download approach
-function downloadViaBlobLink(text, fileName) {
+    // TIER 3: Blob download (desktop browsers)
     try {
         const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
         const url = URL.createObjectURL(blob);
@@ -145,16 +172,17 @@ function downloadViaBlobLink(text, fileName) {
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
         }, 1000);
-        showToast(`💾 Đang tải "${fileName}" — kiểm tra thư mục Downloads!`, 'success');
+        showToast(`💾 Đang tải "${fileName}"`, 'success');
     } catch (e) {
-        // TIER 3: Copy to clipboard as last resort
-        navigator.clipboard.writeText(text).then(() => {
+        // TIER 4: Copy clipboard
+        try {
+            await navigator.clipboard.writeText(text);
             showToast('📋 Không tải được file. Đã copy nội dung vào clipboard!', 'info');
-        }).catch(() => {
+        } catch (clipErr) {
             const ta = document.getElementById('translatedText');
             if (ta) { ta.value = text; ta.select(); }
             showToast('⚠️ Hãy chọn text trong ô kết quả và copy thủ công.', 'warning');
-        });
+        }
     }
 }
 
