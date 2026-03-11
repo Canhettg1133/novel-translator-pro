@@ -137,16 +137,24 @@ async function startMobileTranslation() {
 
     try {
         // Call the existing startTranslation() from engine.js
+        // Note: startTranslation() resolves (not throws) even on cancel
         await startTranslation();
 
-        // Translation complete — switch to result screen
-        showMobileResult();
+        // Show result screen — works for both completed and cancelled
+        const translated = document.getElementById('translatedText').value;
+        if (translated && translated.trim()) {
+            showMobileResult();
+        } else {
+            showScreen('screenInput');
+        }
     } catch (e) {
         console.error('[Mobile] Translation error:', e);
         showToast(`❌ Lỗi: ${e.message}`, 'error');
         showScreen('screenInput');
     } finally {
-        document.getElementById('btnTranslate').disabled = false;
+        // ALWAYS re-enable translate button
+        const btn = document.getElementById('btnTranslate');
+        if (btn) btn.disabled = false;
         releaseWakeLock();
     }
 }
@@ -186,8 +194,8 @@ function updateMobileProgress(completed, total) {
     if (badge) badge.textContent = `${completed}/${total}`;
 
     // Update speed info
-    if (typeof translationStartTime !== 'undefined' && translationStartTime > 0 && completed > 0) {
-        const elapsed = (Date.now() - translationStartTime) / 1000;
+    if (typeof startTime !== 'undefined' && startTime > 0 && completed > 0) {
+        const elapsed = (Date.now() - startTime) / 1000;
         const speed = (completed / elapsed).toFixed(1);
         const remaining = total > completed ? Math.ceil((total - completed) / (completed / elapsed)) : 0;
         const remainStr = remaining > 60 ? `${Math.ceil(remaining / 60)}ph` : `${remaining}s`;
@@ -358,14 +366,33 @@ function downloadMobileResult() {
         showToast('Chưa có kết quả!', 'warning');
         return;
     }
-    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `translated_${new Date().toISOString().slice(0, 10)}.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
-    showToast('💾 Đã tải file!', 'success');
+    
+    const fileName = `translated_${new Date().toISOString().slice(0, 10)}.txt`;
+    
+    try {
+        const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        
+        setTimeout(() => {
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }, 1000);
+        
+        showToast(`💾 Đang tải "${fileName}" — kiểm tra thư mục Downloads trên điện thoại!`, 'success');
+    } catch (e) {
+        // Fallback: copy to clipboard
+        navigator.clipboard.writeText(text).then(() => {
+            showToast('📋 Không tải được file. Đã copy toàn bộ nội dung vào clipboard — dán vào ứng dụng khác để lưu!', 'info');
+        }).catch(() => {
+            showToast('❌ Không thể tải file trên thiết bị này. Dùng nút Copy.', 'error');
+        });
+    }
 }
 
 // ============================================
@@ -387,10 +414,16 @@ function togglePauseMobile() {
 
 function cancelMobileTranslation() {
     if (confirm('Hủy dịch? Phần đã dịch sẽ được giữ lại.')) {
-        if (typeof cancelTranslation === 'function') {
-            cancelTranslation();
-        }
-        showMobileResult();
+        // DIRECTLY set cancel flags — do NOT go through confirmCancel/modal
+        cancelRequested = true;
+        isPaused = false;
+        
+        const percentage = totalChunksCount > 0 ? Math.round((completedChunks / totalChunksCount) * 100) : 0;
+        showToast(`Đã hủy! ${completedChunks}/${totalChunksCount} chunks (${percentage}%)`, 'warning');
+        console.log(`[Mobile Cancel] cancelRequested=true, ${completedChunks}/${totalChunksCount}`);
+        
+        // Don't showMobileResult() immediately — let engine.js finish its loop 
+        // and the finally block in startMobileTranslation will re-enable the button
     }
 }
 
@@ -451,6 +484,22 @@ window.addEventListener('DOMContentLoaded', () => {
     setTimeout(() => {
         updateMobileStats();
         updateMobileStatusBar();
+        
+        // Force render API keys that were loaded from localStorage
+        if (typeof renderProxyKeysList === 'function') renderProxyKeysList();
+        if (typeof renderApiKeysList === 'function') renderApiKeysList();
+        if (typeof renderHistoryList === 'function') renderHistoryList();
+        
+        // Update status bar key count
+        const keyCountEl = document.getElementById('keyCountStatus');
+        if (keyCountEl) {
+            if (useProxy) {
+                const pCount = typeof getProxyKeyCount === 'function' ? getProxyKeyCount() : 0;
+                keyCountEl.textContent = `${pCount} keys`;
+            } else {
+                keyCountEl.textContent = `${apiKeys.length} keys`;
+            }
+        }
     }, 500);
 });
 
@@ -480,12 +529,24 @@ async function pasteToField(fieldId) {
 // KEYBOARD HANDLING - hide stats bar when keyboard opens
 // ============================================
 if (typeof visualViewport !== 'undefined' && visualViewport) {
+    const originalHeight = window.innerHeight;
     visualViewport.addEventListener('resize', () => {
-        const isKeyboardOpen = visualViewport.height < window.innerHeight * 0.75;
-        const statsBar = document.getElementById('statsBar');
-        const langBar = document.querySelector('.lang-bar');
-        if (statsBar) statsBar.style.display = isKeyboardOpen ? 'none' : 'flex';
-        if (langBar) langBar.style.display = isKeyboardOpen ? 'none' : 'flex';
+        const isKeyboardOpen = visualViewport.height < originalHeight * 0.75;
+        const hideElements = [
+            document.getElementById('statsBar'),
+            document.querySelector('.lang-bar'),
+            document.querySelector('.file-upload-mobile'),
+            document.getElementById('btnTranslate')
+        ];
+        hideElements.forEach(el => {
+            if (el) el.style.display = isKeyboardOpen ? 'none' : '';
+        });
+        
+        // Also expand textarea when keyboard is open
+        const textarea = document.getElementById('originalText');
+        if (textarea) {
+            textarea.style.maxHeight = isKeyboardOpen ? '60vh' : '';
+        }
     });
 }
 

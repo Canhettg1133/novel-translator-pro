@@ -246,9 +246,9 @@
                             <label>🔑 API Keys <span class="badge" id="proxyKeyCount" style="font-size:0.7rem">0</span></label>
                             <div id="proxyKeysList"></div>
                             <div style="display:flex;gap:6px;margin-top:6px;">
-                                <input type="password" id="newProxyKeyInput" placeholder="sk-..."
-                                    style="flex:1;font-size:14px;" onkeypress="if(event.key==='Enter')addProxyKey()">
-                                <button class="btn btn-secondary btn-small" onclick="pasteToField('newProxyKeyInput')" title="Dán">📋</button>
+                                <input type="text" id="newProxyKeyInput" placeholder="sk-..."
+                                    style="flex:1;font-size:14px;" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+                                    onkeypress="if(event.key==='Enter')addProxyKey()">
                                 <button class="btn btn-primary btn-small" onclick="addProxyKey()">➕</button>
                             </div>
                         </div>
@@ -276,9 +276,9 @@
                     <div class="form-group-mobile">
                         <div id="apiKeysList"></div>
                         <div style="display:flex;gap:6px;margin-top:6px;">
-                            <input type="password" id="newApiKey" placeholder="AIza..."
-                                style="flex:1;font-size:14px;" onkeypress="if(event.key==='Enter')addApiKey()">
-                            <button class="btn btn-secondary btn-small" onclick="pasteToField('newApiKey')" title="Dán">📋</button>
+                            <input type="text" id="newApiKey" placeholder="AIza..."
+                                style="flex:1;font-size:14px;" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+                                onkeypress="if(event.key==='Enter')addApiKey()">
                             <button class="btn btn-primary btn-small" onclick="addApiKey()">➕</button>
                         </div>
                     </div>
@@ -438,6 +438,7 @@
     <script src="js/ui/settings.js"></script>
     <script src="js/ui/progress.js"></script>
     <script src="js/ui/controls.js"></script>
+    <script src="js/ui/file-handler.js"></script>
     <script src="js/ui/chunk-tracker.js"></script>
     <script src="js/history/history.js"></script>
     <script src="js/gemini/rpd-tracker.js"></script>
