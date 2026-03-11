@@ -136,8 +136,8 @@ async function startMobileTranslation() {
     updateMobileProgress(0, 1);
 
     try {
-        // Call the existing translateText() from engine.js
-        await translateText();
+        // Call the existing startTranslation() from engine.js
+        await startTranslation();
 
         // Translation complete — switch to result screen
         showMobileResult();
@@ -405,6 +405,41 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 // ============================================
+// PASTE FROM CLIPBOARD
+// ============================================
+async function pasteToField(fieldId) {
+    try {
+        const text = await navigator.clipboard.readText();
+        const field = document.getElementById(fieldId);
+        if (field) {
+            field.value = text;
+            if (fieldId === 'originalText') updateMobileStats();
+            showToast('\ud83d\udccb \u0110\u00e3 d\u00e1n t\u1eeb clipboard!', 'success');
+        }
+    } catch (e) {
+        // Fallback: focus field and let user paste manually
+        const field = document.getElementById(fieldId);
+        if (field) {
+            field.focus();
+            showToast('\u26a0\ufe0f Nh\u1ea5n gi\u1eef \u0111\u1ec3 d\u00e1n (Android)', 'info');
+        }
+    }
+}
+
+// ============================================
+// KEYBOARD HANDLING - hide stats bar when keyboard opens
+// ============================================
+if (typeof visualViewport !== 'undefined' && visualViewport) {
+    visualViewport.addEventListener('resize', () => {
+        const isKeyboardOpen = visualViewport.height < window.innerHeight * 0.75;
+        const statsBar = document.getElementById('statsBar');
+        const langBar = document.querySelector('.lang-bar');
+        if (statsBar) statsBar.style.display = isKeyboardOpen ? 'none' : 'flex';
+        if (langBar) langBar.style.display = isKeyboardOpen ? 'none' : 'flex';
+    });
+}
+
+// ============================================
 // FILE UPLOAD
 // ============================================
 function handleMobileFile(event) {
@@ -444,3 +479,4 @@ window.toggleMobileChunkList = toggleMobileChunkList;
 window.updateMobileStats = updateMobileStats;
 window.handleMobileFile = handleMobileFile;
 window.clearMobileFile = clearMobileFile;
+window.pasteToField = pasteToField;

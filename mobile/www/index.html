@@ -57,7 +57,10 @@
         <div class="input-section">
             <div class="input-header">
                 <label for="originalText">📝 Nội dung cần dịch</label>
-                <button class="btn-icon" onclick="document.getElementById('originalText').value=''; updateMobileStats();" title="Xóa">🗑️</button>
+                <div>
+                    <button class="btn-icon" onclick="pasteToField('originalText')" title="Dán">📋</button>
+                    <button class="btn-icon" onclick="document.getElementById('originalText').value=''; updateMobileStats();" title="Xóa">🗑️</button>
+                </div>
             </div>
             <textarea id="originalText" class="mobile-textarea"
                 placeholder="Dán nội dung tiểu thuyết cần dịch vào đây...&#10;&#10;Hoặc bấm 📁 Tải file .txt ở trên."
@@ -387,11 +390,23 @@
         <div id="progressSection"></div>
         <div id="resultSection"></div>
         <div id="progressBar"></div>
+        <div id="progressFill"></div>
         <div id="progressText"></div>
+        <div id="progressDetails"></div>
         <div id="progressStats"></div>
+        <div id="progressStatus"></div>
         <div id="charCount"></div>
         <div id="chunkCount"></div>
         <div id="estimatedTime"></div>
+        <button id="translateBtn"></button>
+        <button id="pauseBtn"></button>
+        <button id="cancelBtn"></button>
+        <div id="speedStat"></div>
+        <div id="activeKeysStat"></div>
+        <div id="etaStat"></div>
+        <div id="cancelModal" style="display:none;">
+            <div id="cancelModalStats"></div>
+        </div>
         <div id="chunkTrackerPanel" style="display:none;">
             <div id="chunkTrackerBody">
                 <div id="chunkTrackerList"></div>
@@ -412,7 +427,7 @@
     <!-- ============================================ -->
     <script src="js/app.js"></script>
     <script src="js/gemini/api.js"></script>
-    <script src="js/gemini/quota.js"></script>
+    <script src="js/gemini/model-rotation.js"></script>
     <script src="js/translation/chunker.js"></script>
     <script src="js/translation/engine.js"></script>
     <script src="js/translation/retry.js"></script>
@@ -422,8 +437,8 @@
     <script src="js/ui/progress.js"></script>
     <script src="js/ui/controls.js"></script>
     <script src="js/ui/chunk-tracker.js"></script>
-    <script src="js/ui/history.js"></script>
-    <script src="js/ui/rpd-tracker.js"></script>
+    <script src="js/history/history.js"></script>
+    <script src="js/gemini/rpd-tracker.js"></script>
     <script src="js/init.js"></script>
     <script src="mobile.js"></script>
 </body>

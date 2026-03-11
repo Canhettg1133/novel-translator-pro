@@ -421,33 +421,38 @@ function initializeApp() {
 function setupEventListeners() {
     // File input
     const fileInput = document.getElementById('fileInput');
-    fileInput.addEventListener('change', handleFileSelect);
+    if (fileInput) fileInput.addEventListener('change', handleFileSelect);
 
-    // Drag and drop
+    // Drag and drop (web only, not on mobile)
     const uploadArea = document.getElementById('uploadArea');
-    uploadArea.addEventListener('dragover', handleDragOver);
-    uploadArea.addEventListener('dragleave', handleDragLeave);
-    uploadArea.addEventListener('drop', handleDrop);
-
-    uploadArea.addEventListener('click', (e) => {
-        if (e.target !== fileInput) {
-            fileInput.click();
-        }
-    });
+    if (uploadArea) {
+        uploadArea.addEventListener('dragover', handleDragOver);
+        uploadArea.addEventListener('dragleave', handleDragLeave);
+        uploadArea.addEventListener('drop', handleDrop);
+        uploadArea.addEventListener('click', (e) => {
+            if (e.target !== fileInput) {
+                fileInput.click();
+            }
+        });
+    }
 
     // Text input
     const originalText = document.getElementById('originalText');
-    originalText.addEventListener('input', updateStats);
+    if (originalText) originalText.addEventListener('input', updateStats);
 
     // Settings auto-save
     ['sourceLang', 'parallelCount', 'chunkSize', 'delayMs'].forEach(id => {
-        document.getElementById(id).addEventListener('change', saveSettings);
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('change', saveSettings);
     });
 
     // Enter key for adding API
-    document.getElementById('newApiKey').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') addApiKey();
-    });
+    const newApiKey = document.getElementById('newApiKey');
+    if (newApiKey) {
+        newApiKey.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') addApiKey();
+        });
+    }
 }
 
 // ============================================
@@ -512,8 +517,10 @@ function renderApiKeysList() {
     const countBadge = document.getElementById('apiCount');
     const activeCount = getActiveKeyCount();
 
-    countBadge.textContent = `${activeCount}/${apiKeys.length} keys`;
-    countBadge.style.background = activeCount === apiKeys.length ? 'var(--success)' : 'var(--warning)';
+    if (countBadge) {
+        countBadge.textContent = `${activeCount}/${apiKeys.length} keys`;
+        countBadge.style.background = activeCount === apiKeys.length ? 'var(--success)' : 'var(--warning)';
+    }
 
     if (apiKeys.length === 0) {
         container.innerHTML = '<p class="empty-message">Chưa có API key nào. Thêm ít nhất 1 key để bắt đầu dịch.</p>';
