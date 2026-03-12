@@ -7,6 +7,10 @@
 // TRANSLATE WITH RETRY + PROGRESSIVE PROMPT
 // ============================================
 async function translateChunkWithRetry(text, chunkIndex, retries = 5) {
+    if (cancelRequested) {
+        throw new Error('TRANSLATION_CANCELLED');
+    }
+
     // Danh sách temperature để thử - mỗi lần retry dùng temperature khác
     const temperatures = [0.7, 0.9, 0.5, 1.0, 0.3, 0.8, 0.6, 1.2, 0.4, 0.95];
 
@@ -17,6 +21,10 @@ async function translateChunkWithRetry(text, chunkIndex, retries = 5) {
     const originalText = text;
 
     for (let attempt = 1; attempt <= retries; attempt++) {
+        if (cancelRequested) {
+            throw new Error('TRANSLATION_CANCELLED');
+        }
+
         let modelKeyPair = null;
         try {
             const temperature = temperatures[(attempt - 1) % temperatures.length];
@@ -135,7 +143,11 @@ async function translateChunkWithRetry(text, chunkIndex, retries = 5) {
             return result;
 
         } catch (error) {
-            const errorMsg = error.message.toLowerCase();
+            if (cancelRequested || (error && String(error.message || '').includes('TRANSLATION_CANCELLED'))) {
+                throw new Error('TRANSLATION_CANCELLED');
+            }
+
+            const errorMsg = String(error?.message || error || '').toLowerCase();
 
             // ========== PROXY MODE: XỬ LÝ 403/429 ĐẶC BIỆT ==========
             if (useProxy) {
@@ -337,6 +349,10 @@ async function translateChunkWithRetry(text, chunkIndex, retries = 5) {
 // SPLIT LARGE CHUNK - Chia nhỏ chunk thông minh
 // ============================================
 async function translateLargeChunkBySplitting(text, chunkIndex) {
+    if (cancelRequested) {
+        throw new Error('TRANSLATION_CANCELLED');
+    }
+
     console.log(`[Chunk ${chunkIndex + 1}] 📦 Splitting into smaller parts...`);
 
     // Chia thành nhiều phần nhỏ hơn (4-5 phần thay vì 3)
@@ -347,6 +363,10 @@ async function translateLargeChunkBySplitting(text, chunkIndex) {
     console.log(`[Chunk ${chunkIndex + 1}] Split into ${parts.length} sub-chunks`);
 
     for (let i = 0; i < parts.length; i++) {
+        if (cancelRequested) {
+            throw new Error('TRANSLATION_CANCELLED');
+        }
+
         const partText = '[AUTO-SPLIT]' + parts[i];
         console.log(`[Chunk ${chunkIndex + 1}] Translating sub-chunk ${i + 1}/${parts.length}...`);
 
@@ -363,6 +383,9 @@ async function translateLargeChunkBySplitting(text, chunkIndex) {
                 recordKeySuccess(modelKeyPair.keyIndex);
             }
         } catch (e) {
+            if (cancelRequested || (e && String(e.message || '').includes('TRANSLATION_CANCELLED'))) {
+                throw new Error('TRANSLATION_CANCELLED');
+            }
             console.warn(`[Chunk ${chunkIndex + 1}] Sub-chunk ${i + 1} failed: ${e.message}`);
             // Giữ nguyên text gốc nếu sub-chunk fail
             translatedParts.push(parts[i]);

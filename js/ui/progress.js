@@ -37,7 +37,35 @@ function formatTime(seconds) {
 // SLEEP UTILITIES
 // ============================================
 function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    const duration = Number.isFinite(ms) ? Math.max(0, ms) : 0;
+    if (duration === 0) {
+        return Promise.resolve();
+    }
+
+    // Make long waits interruptible so cancel feels instant.
+    return new Promise(resolve => {
+        const stepMs = 100;
+        let elapsed = 0;
+
+        const tick = () => {
+            if (cancelRequested) {
+                resolve();
+                return;
+            }
+            if (elapsed >= duration) {
+                resolve();
+                return;
+            }
+
+            const wait = Math.min(stepMs, duration - elapsed);
+            setTimeout(() => {
+                elapsed += wait;
+                tick();
+            }, wait);
+        };
+
+        tick();
+    });
 }
 
 // Sleep với countdown hiển thị trên UI

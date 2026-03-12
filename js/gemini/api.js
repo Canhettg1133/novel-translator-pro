@@ -14,7 +14,10 @@ async function translateChunkViaProxy(text, temperature = 0.7, apiKeyOverride = 
     console.log(`[Proxy] Model: ${proxyModel} | Temp: ${temperature} | Key: ...${activeKey.slice(-6)}`);
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 min timeout
+    if (typeof registerActiveRequestController === 'function') {
+        registerActiveRequestController(controller);
+    }
+    const timeoutId = setTimeout(() => controller.abort('request-timeout'), 120000); // 2 min timeout
 
     let response;
     try {
@@ -33,13 +36,19 @@ async function translateChunkViaProxy(text, temperature = 0.7, apiKeyOverride = 
             signal: controller.signal
         });
     } catch (fetchError) {
-        clearTimeout(timeoutId);
         if (fetchError.name === 'AbortError') {
+            if (cancelRequested) {
+                throw new Error('TRANSLATION_CANCELLED');
+            }
             throw new Error(`Proxy timeout sau 120s - ${proxyModel}`);
         }
         throw fetchError;
+    } finally {
+        clearTimeout(timeoutId);
+        if (typeof unregisterActiveRequestController === 'function') {
+            unregisterActiveRequestController(controller);
+        }
     }
-    clearTimeout(timeoutId);
 
     if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -128,7 +137,10 @@ async function translateChunk(text, modelKeyPair, temperature = 0.7) {
 
     // TIMEOUT: 120 giây (gemini-2.5-flash thinking cần 60-90s cho text dài)
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 120000);
+    if (typeof registerActiveRequestController === 'function') {
+        registerActiveRequestController(controller);
+    }
+    const timeoutId = setTimeout(() => controller.abort('request-timeout'), 120000);
 
     let response;
     try {
@@ -139,13 +151,19 @@ async function translateChunk(text, modelKeyPair, temperature = 0.7) {
             signal: controller.signal
         });
     } catch (fetchError) {
-        clearTimeout(timeoutId);
         if (fetchError.name === 'AbortError') {
+            if (cancelRequested) {
+                throw new Error('TRANSLATION_CANCELLED');
+            }
             throw new Error(`API timeout sau 120s - ${modelName} + Key ${keyIndex + 1}`);
         }
         throw fetchError;
+    } finally {
+        clearTimeout(timeoutId);
+        if (typeof unregisterActiveRequestController === 'function') {
+            unregisterActiveRequestController(controller);
+        }
     }
-    clearTimeout(timeoutId);
 
     if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));

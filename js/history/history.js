@@ -10,7 +10,12 @@ function loadHistory() {
     const saved = localStorage.getItem('novelTranslatorHistory');
     if (saved) {
         try {
-            translationHistory = JSON.parse(saved);
+            const parsed = JSON.parse(saved);
+            translationHistory = Array.isArray(parsed) ? parsed.map(item => ({
+                ...item,
+                translatedChunksData: Array.isArray(item.translatedChunksData) ? item.translatedChunksData : null,
+                chunkSizeUsed: Number.isFinite(parseInt(item.chunkSizeUsed, 10)) ? parseInt(item.chunkSizeUsed, 10) : null
+            })) : [];
         } catch (e) {
             console.error('Error loading history:', e);
             translationHistory = [];
@@ -24,11 +29,19 @@ function saveHistory() {
             translationHistory = translationHistory.slice(-20);
         }
 
-        // Lưu full text — chỉ bỏ chunks array để tiết kiệm
-        const saveData = translationHistory.map(item => ({
-            ...item,
-            chunks: [] // Chunks array quá lớn, không lưu
-        }));
+        // Luu full text, bo chunks goc de nhe bo nho.
+        // Giu translatedChunksData chi cho item chua hoan thanh de resume dung chunk.
+        const saveData = translationHistory.map(item => {
+            const keepResumeData = !item.isComplete &&
+                Array.isArray(item.translatedChunksData) &&
+                item.translatedChunksData.length === item.totalChunks;
+
+            return {
+                ...item,
+                chunks: [],
+                translatedChunksData: keepResumeData ? item.translatedChunksData : null
+            };
+        });
 
         localStorage.setItem('novelTranslatorHistory', JSON.stringify(saveData));
     } catch (e) {
@@ -42,7 +55,8 @@ function saveHistory() {
                     ...item,
                     originalText: item.originalText ? item.originalText.substring(0, 2000) : '',
                     translatedText: item.translatedText ? item.translatedText.substring(0, 2000) : '',
-                    chunks: []
+                    chunks: [],
+                    translatedChunksData: null
                 }));
                 localStorage.setItem('novelTranslatorHistory', JSON.stringify(lightHistory));
                 showToast('Đã xóa bớt lịch sử cũ để tiết kiệm bộ nhớ.', 'warning');
@@ -55,7 +69,11 @@ function saveHistory() {
     }
 }
 
-function addToHistory(name, originalText, translatedText, chunks, completedCount, totalCount) {
+function addToHistory(name, originalText, translatedText, chunks, completedCount, totalCount, translatedChunksSnapshot = null, chunkSizeUsed = null) {
+    const normalizedChunkData = Array.isArray(translatedChunksSnapshot)
+        ? translatedChunksSnapshot.slice(0, totalCount).map(chunk => typeof chunk === 'string' ? chunk : null)
+        : null;
+
     const historyItem = {
         id: Date.now().toString(),
         name: name,
@@ -66,7 +84,13 @@ function addToHistory(name, originalText, translatedText, chunks, completedCount
         completedChunks: completedCount,
         totalChunks: totalCount,
         charCount: originalText.length,
-        isComplete: completedCount >= totalCount
+        isComplete: completedCount >= totalCount,
+        translatedChunksData: completedCount < totalCount ? normalizedChunkData : null,
+        chunkSizeUsed: Number.isFinite(parseInt(chunkSizeUsed, 10))
+            ? parseInt(chunkSizeUsed, 10)
+            : (Number.isFinite(parseInt(document.getElementById('chunkSize')?.value, 10))
+                ? parseInt(document.getElementById('chunkSize')?.value, 10)
+                : null)
     };
 
     if (currentHistoryId) {
@@ -87,13 +111,26 @@ function addToHistory(name, originalText, translatedText, chunks, completedCount
     return historyItem.id;
 }
 
-function updateHistoryProgress(id, translatedText, chunks, completedCount) {
+function updateHistoryProgress(id, translatedText, chunks, completedCount, translatedChunksSnapshot = null, chunkSizeUsed = null) {
     const index = translationHistory.findIndex(h => h.id === id);
     if (index !== -1) {
         translationHistory[index].translatedText = translatedText;
         translationHistory[index].chunks = chunks;
         translationHistory[index].completedChunks = completedCount;
         translationHistory[index].isComplete = completedCount >= translationHistory[index].totalChunks;
+        translationHistory[index].translatedChunksData =
+            translationHistory[index].isComplete ? null :
+                (Array.isArray(translatedChunksSnapshot)
+                    ? translatedChunksSnapshot
+                        .slice(0, translationHistory[index].totalChunks)
+                        .map(chunk => typeof chunk === 'string' ? chunk : null)
+                    : translationHistory[index].translatedChunksData || null);
+        if (Number.isFinite(parseInt(chunkSizeUsed, 10))) {
+            translationHistory[index].chunkSizeUsed = parseInt(chunkSizeUsed, 10);
+        } else if (!Number.isFinite(parseInt(translationHistory[index].chunkSizeUsed, 10))) {
+            const currentChunkSize = parseInt(document.getElementById('chunkSize')?.value, 10);
+            translationHistory[index].chunkSizeUsed = Number.isFinite(currentChunkSize) ? currentChunkSize : null;
+        }
         translationHistory[index].date = new Date().toISOString();
         saveHistory();
         renderHistoryList();
@@ -164,15 +201,46 @@ function continueFromHistory(id) {
 
     document.getElementById('originalText').value = item.originalText;
     originalFileName = item.name;
+
+    // Restore chunk size used by this saved run to keep chunk boundaries stable.
+    if (Number.isFinite(parseInt(item.chunkSizeUsed, 10))) {
+        const chunkSizeInput = document.getElementById('chunkSize');
+        if (chunkSizeInput) {
+            chunkSizeInput.value = String(parseInt(item.chunkSizeUsed, 10));
+        }
+    }
+
     currentHistoryId = id;
 
     originalChunks = item.chunks || [];
-    translatedChunks = item.translatedText ? item.translatedText.split('\n\n') : [];
-    completedChunks = item.completedChunks || 0;
     totalChunksCount = item.totalChunks || 0;
+    let canResumePrecisely = false;
+
+    // Preferred path: exact per-chunk data (new format)
+    if (Array.isArray(item.translatedChunksData) && item.translatedChunksData.length === totalChunksCount) {
+        translatedChunks = item.translatedChunksData.map(chunk => typeof chunk === 'string' ? chunk : null);
+        canResumePrecisely = true;
+    } else {
+        // Legacy entries do not have precise per-chunk snapshots.
+        // Do not try to split by "\n\n" because that corrupts chunk mapping.
+        translatedChunks = new Array(totalChunksCount).fill(null);
+    }
+
+    completedChunks = translatedChunks.filter(chunk => isChunkSuccessfullyTranslated(chunk)).length;
+
+    // Show current partial output for user visibility
+    document.getElementById('translatedText').value = translatedChunks
+        .map((chunk, idx) => chunk !== null ? chunk : `[⏳ Chưa dịch chunk ${idx + 1}]`)
+        .join('\n\n');
 
     updateStats();
-    showToast(`Đã tải "${item.name}" - Tiếp tục từ chunk ${completedChunks}/${totalChunksCount}`, 'success');
+    if (!canResumePrecisely) {
+        // Avoid overwriting old legacy history with a wrong "resume" state.
+        currentHistoryId = null;
+        showToast('Bản lưu cũ không có dữ liệu chunk chi tiết, sẽ tạo lượt dịch mới để tránh sai lệch.', 'warning');
+    } else {
+        showToast(`Đã tải "${item.name}" - Tiếp tục từ chunk ${completedChunks}/${totalChunksCount}`, 'success');
+    }
     document.getElementById('translateBtn').scrollIntoView({ behavior: 'smooth' });
 }
 
@@ -300,4 +368,19 @@ function escapeHtml(text) {
 
 function formatNumber(num) {
     return num.toLocaleString('vi-VN');
+}
+
+function isChunkSuccessfullyTranslated(chunkText) {
+    if (typeof chunkText !== 'string') return false;
+
+    const text = chunkText.trim();
+    if (!text) return false;
+
+    // Markers for failed / placeholder chunks
+    if (text.startsWith('[LỖI CHUNK')) return false;
+    if (/^\[❌\s*Chunk\s+\d+\s+thất bại\]/i.test(text)) return false;
+    if (text.includes('CẦN DỊCH THỦ CÔNG')) return false;
+    if (/^\[⏳\s*Chưa dịch chunk/i.test(text)) return false;
+
+    return true;
 }

@@ -31,6 +31,32 @@ let requestTimestamps = {};
 // Key health tracking
 let keyHealthMap = {};
 
+// Active network requests for instant cancel (Gemini/Proxy/Ollama)
+const activeRequestControllers = new Set();
+
+function registerActiveRequestController(controller) {
+    if (controller && typeof controller.abort === 'function') {
+        activeRequestControllers.add(controller);
+    }
+}
+
+function unregisterActiveRequestController(controller) {
+    if (controller) {
+        activeRequestControllers.delete(controller);
+    }
+}
+
+function abortActiveTranslationRequests(reason = 'cancelled-by-user') {
+    activeRequestControllers.forEach(controller => {
+        try {
+            controller.abort(reason);
+        } catch (e) {
+            console.warn('[Cancel] Failed to abort controller:', e);
+        }
+    });
+    activeRequestControllers.clear();
+}
+
 // ============================================
 // PROXY API MODE (BeiJiXingXing, OpenRouter, etc.)
 // ============================================

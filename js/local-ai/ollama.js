@@ -233,7 +233,10 @@ async function translateWithOllama(text, temperature = 0.7) {
     }
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 300000);
+    if (typeof registerActiveRequestController === 'function') {
+        registerActiveRequestController(controller);
+    }
+    const timeoutId = setTimeout(() => controller.abort('request-timeout'), 300000);
 
     let response;
     try {
@@ -244,16 +247,22 @@ async function translateWithOllama(text, temperature = 0.7) {
             signal: controller.signal
         });
     } catch (fetchError) {
-        clearTimeout(timeoutId);
         if (fetchError.name === 'AbortError') {
+            if (cancelRequested) {
+                throw new Error('TRANSLATION_CANCELLED');
+            }
             throw new Error(`Ollama timeout sau 300s - Chunk quá dài hoặc model quá chậm.`);
         }
         if (fetchError.message.includes('Failed to fetch')) {
             throw new Error('Không thể kết nối Ollama. Đảm bảo Ollama đang chạy!');
         }
         throw fetchError;
+    } finally {
+        clearTimeout(timeoutId);
+        if (typeof unregisterActiveRequestController === 'function') {
+            unregisterActiveRequestController(controller);
+        }
     }
-    clearTimeout(timeoutId);
 
     if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));

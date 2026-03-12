@@ -3,6 +3,9 @@
  * Xử lý pause, resume, cancel
  */
 
+// Track whether cancel confirmation auto-paused the translation.
+let cancelModalAutoPaused = false;
+
 // ============================================
 // PAUSE / RESUME FUNCTIONALITY
 // ============================================
@@ -46,7 +49,10 @@ function confirmCancel() {
 
     // Pause first
     if (!isPaused) {
+        cancelModalAutoPaused = true;
         togglePause();
+    } else {
+        cancelModalAutoPaused = false;
     }
 
     // Update modal stats
@@ -79,23 +85,33 @@ function closeCancelModal() {
     document.getElementById('cancelModal').style.display = 'none';
 
     // Resume if was paused for confirmation
-    if (isPaused && isTranslating) {
+    if (cancelModalAutoPaused && isPaused && isTranslating) {
         togglePause();
     }
+    cancelModalAutoPaused = false;
 }
 
 function executeCancel() {
+    if (!isTranslating || cancelRequested) {
+        return;
+    }
+
     // Close modal
     document.getElementById('cancelModal').style.display = 'none';
+    cancelModalAutoPaused = false;
 
     // Update button to show cancelling state
     const cancelBtn = document.getElementById('cancelBtn');
     cancelBtn.classList.add('cancelling');
+    cancelBtn.disabled = true;
     cancelBtn.innerHTML = '<span class="btn-icon">🔄</span><span class="btn-text">Đang hủy...</span>';
 
     // Set cancel flag
     cancelRequested = true;
     isPaused = false;
+    if (typeof abortActiveTranslationRequests === 'function') {
+        abortActiveTranslationRequests();
+    }
 
     updateProgress(completedChunks, totalChunksCount, '🛑 Đang hủy và lưu tiến trình...');
 
