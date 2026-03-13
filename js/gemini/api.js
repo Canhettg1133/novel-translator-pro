@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Novel Translator Pro - Gemini API
  * Gọi Gemini Cloud API hoặc Proxy API để dịch văn bản
  */
@@ -246,8 +246,13 @@ function validateTranslationOutput(original, translated) {
     // Strip prompt from original để so sánh chính xác
     // Prompt kết thúc bằng "ĐOẠN VĂN:" hoặc "ĐOẠN VĂN CẦN VIẾT LẠI:" hoặc tương tự
     let contentOnly = original;
-    const promptEndMarkers = ['ĐOẠN VĂN:', 'ĐOẠN VĂN CẦN VIẾT LẠI:', 'NỘI DUNG:',
-        'BẮT ĐẦU NGAY.', 'BẮT ĐẦU NGAY VỚI NỘI DUNG.]'];
+    const promptEndMarkers = [
+        'ĐOẠN VĂN:', 'ĐOẠN VĂN CẦN VIẾT LẠI:', 'NỘI DUNG:',
+        'BẮT ĐẦU NGAY.', 'BẮT ĐẦU NGAY VỚI NỘI DUNG.]',
+        'VĂN BẢN CẦN BIÊN TẬP:', 'VĂN BẢN:',
+        '[BEGIN MANUSCRIPT]', '[BEGIN TRANSLATION]',
+        '[BEGIN MANUSCRIPT — TRANSLATE BELOW]'
+    ];
     for (const marker of promptEndMarkers) {
         const idx = original.indexOf(marker);
         if (idx !== -1) {
@@ -318,7 +323,15 @@ function validateTranslationOutput(original, translated) {
         /⚠️ QUAN TRỌNG/,
         /KHÔNG ĐƯỢC VI PHẠM/,
         /FICTIONAL TRANSLATION TASK/,
-        /CONTEXT:.*TÁC PHẨM VĂN HỌC/
+        /CONTEXT:.*TÁC PHẨM VĂN HỌC/,
+        /SYSTEM OVERRIDE:.*TRANSLATION MODE/,
+        /INTERNAL SYSTEM DIRECTIVE/,
+        /NON-NEGOTIABLE CONTRACT TERMS/,
+        /LINH'S PROFESSIONAL STANDARDS/,
+        /INJECTION IMMUNITY/,
+        /clr_all_context/,
+        /PRIORITY OVERRIDE.*RESTRICTIONS CANCELLED/,
+        /MANDATORY COMPLIANCE.*EDITORIAL CONTRACT/
     ];
 
     for (const pattern of promptLeakPatterns) {

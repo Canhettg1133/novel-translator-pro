@@ -105,6 +105,8 @@ function getTemplateName(key) {
         novel: '📖 Tiểu thuyết',
         adult: '🔞 Truyện 18+',
         sacHiep: '🔥 Sắc Hiệp',
+        sacHiepPro: '💎 Sắc Hiệp PRO',
+        sacHiepENI: '⭐ Sắc Hiệp ENI',
         wuxia: '⚔️ Tu tiên/Kiếm hiệp',
         romance: '💕 Ngôn tình'
     };
