@@ -279,7 +279,7 @@ function renderHistoryList() {
                     <div class="history-name">${escapeHtml(item.name)}</div>
                     <div class="history-meta">
                         <span>📅 ${dateStr}</span>
-                        <span>đŸ“ ${formatNumber(item.charCount)} chữ</span>
+                        <span>📝 ${formatNumber(item.charCount)} chữ</span>
                         <span>📦 ${item.completedChunks}/${item.totalChunks} chunks</span>
                     </div>
                 </div>
@@ -287,9 +287,9 @@ function renderHistoryList() {
                     <div class="history-progress-fill ${item.isComplete ? 'complete' : ''}" style="width: ${progress}%"></div>
                 </div>
                 <div class="history-btns">
-                    ${!item.isComplete ? `<button onclick="continueFromHistory('${item.id}')" title="Tiếp tục dịch">â–¶ï¸</button>` : ''}
-                    <button onclick="loadFromHistory('${item.id}')" title="Xem/Tải vá»">đŸ‘ï¸</button>
-                    <button onclick="deleteFromHistory('${item.id}')" class="btn-delete" title="Xóa">đŸ—‘️</button>
+                    ${!item.isComplete ? `<button onclick="continueFromHistory('${item.id}')" title="Tiếp tục dịch">▶️</button>` : ''}
+                    <button onclick="loadFromHistory('${item.id}')" title="Xem/Tải về">👁️</button>
+                    <button onclick="deleteFromHistory('${item.id}')" class="btn-delete" title="Xóa">🗑️</button>
                 </div>
             </div>
         `;
@@ -310,7 +310,7 @@ function continueFromHistory(id) {
     }
 
     if (isTranslating) {
-        showToast('Äang có bản dịch khác đang chạy!', 'warning');
+        showToast('Đang có bản dịch khác đang chạy!', 'warning');
         return;
     }
 
@@ -327,7 +327,11 @@ function continueFromHistory(id) {
 
     currentHistoryId = id;
 
-    originalChunks = item.chunks || [];
+    // FIX: chunks bị xóa khi lưu, cần re-chunk từ originalText
+    originalChunks = item.chunks && item.chunks.length > 0
+        ? item.chunks
+        : (typeof rechunkText === 'function' ? rechunkText(item.originalText) : []);
+
     totalChunksCount = item.totalChunks || 0;
     let canResumePrecisely = false;
 
@@ -345,7 +349,7 @@ function continueFromHistory(id) {
 
     // Show current partial output for user visibility
     document.getElementById('translatedText').value = translatedChunks
-        .map((chunk, idx) => chunk !== null ? chunk : `[â³ Chưa dịch chunk ${idx + 1}]`)
+        .map((chunk, idx) => chunk !== null ? chunk : `[⏳ Chưa dịch chunk ${idx + 1}]`)
         .join('\n\n');
 
     updateStats();
@@ -354,7 +358,7 @@ function continueFromHistory(id) {
         currentHistoryId = null;
         showToast('Bản lưu cũ không có dữ liệu chunk chi tiết, sẽ tạo lượt dịch mới để tránh sai lệch.', 'warning');
     } else {
-        showToast(`ĐĂ£ tải "${item.name}" - Tiếp tục từ chunk ${completedChunks}/${totalChunksCount}`, 'success');
+        showToast(`Đã tải "${item.name}" - Tiếp tục từ chunk ${completedChunks}/${totalChunksCount}`, 'success');
     }
     document.getElementById('translateBtn').scrollIntoView({ behavior: 'smooth' });
 }
@@ -373,7 +377,7 @@ function loadFromHistory(id) {
     document.getElementById('resultSection').style.display = 'block';
 
     updateStats();
-    showToast(`ĐĂ£ tải "${item.name}"`, 'success');
+    showToast(`Đã tải "${item.name}"`, 'success');
     document.getElementById('resultSection').scrollIntoView({ behavior: 'smooth' });
 }
 
@@ -385,7 +389,7 @@ function deleteFromHistory(id) {
     translationHistory = translationHistory.filter(h => h.id !== id);
     saveHistory();
     renderHistoryList();
-    showToast('ÄĂ£ xóa khá»i lịch sử!', 'info');
+    showToast('Đã xóa khỏi lịch sử!', 'info');
 }
 
 function clearAllHistory() {
@@ -401,7 +405,7 @@ function clearAllHistory() {
     translationHistory = [];
     saveHistory();
     renderHistoryList();
-    showToast('ĐĂ£ xóa tất cả lịch sử!', 'success');
+    showToast('Đã xóa tất cả lịch sử!', 'success');
 }
 
 function exportHistory() {
@@ -427,7 +431,7 @@ function exportHistory() {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 
-    showToast(`ĐĂ£ xuất ${translationHistory.length} bản dịch!`, 'success');
+    showToast(`Đã xuất ${translationHistory.length} bản dịch!`, 'success');
 }
 
 function importHistory(event) {
@@ -446,14 +450,15 @@ function importHistory(event) {
             const importCount = data.history.length;
             let newCount = 0;
 
-            data.history.forEach(item => {
+            // FIX: dùng index để tránh trùng ID khi Date.now() giống nhau
+            data.history.forEach((item, index) => {
                 const exists = translationHistory.some(h =>
                     h.id === item.id ||
                     (h.name === item.name && h.date === item.date)
                 );
 
                 if (!exists) {
-                    item.id = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+                    item.id = `${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`;
                     translationHistory.push(item);
                     newCount++;
                 }
@@ -461,7 +466,7 @@ function importHistory(event) {
 
             saveHistory();
             renderHistoryList();
-            showToast(`ĐĂ£ nhập ${newCount}/${importCount} bản dịch mới!`, 'success');
+            showToast(`Đã nhập ${newCount}/${importCount} bản dịch mới!`, 'success');
 
         } catch (error) {
             console.error('Import error:', error);
@@ -491,12 +496,11 @@ function isChunkSuccessfullyTranslated(chunkText) {
     const text = chunkText.trim();
     if (!text) return false;
 
-    // Markers for failed / placeholder chunks
+    // FIX: Dùng ký tự Unicode đúng thay vì chuỗi bị mojibake
     if (text.startsWith('[LỖI CHUNK')) return false;
-    if (/^\[âŒ\s*Chunk\s+\d+\s+thất bại\]/i.test(text)) return false;
+    if (/^\[❌\s*Chunk\s+\d+\s+thất bại\]/i.test(text)) return false;
     if (text.includes('CẦN DỊCH THỦ CÔNG')) return false;
-    if (/^\[â³\s*Chưa dịch chunk/i.test(text)) return false;
+    if (/^\[⏳\s*Chưa dịch chunk/i.test(text)) return false;
 
     return true;
 }
-

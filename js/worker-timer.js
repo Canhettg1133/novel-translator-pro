@@ -54,7 +54,7 @@ function initWorkerTimer() {
         timerWorker = new Worker(workerUrl);
         URL.revokeObjectURL(workerUrl);
 
-        timerWorker.onmessage = function(e) {
+        timerWorker.onmessage = function (e) {
             const { type, id } = e.data;
             if (type === 'timeout') {
                 const callback = workerCallbacks.get(id);
@@ -65,9 +65,11 @@ function initWorkerTimer() {
             }
         };
 
-        timerWorker.onerror = function(err) {
+        // FIX: Thêm workerCallbacks.clear() để tránh memory leak khi Worker lỗi
+        timerWorker.onerror = function (err) {
             console.warn('[WorkerTimer] Worker error, falling back to setTimeout:', err);
             workerAvailable = false;
+            workerCallbacks.clear();
         };
 
         workerAvailable = true;
@@ -107,37 +109,27 @@ function workerClearTimeout(id) {
 
 /**
  * Sleep sử dụng Worker Timer - KHÔNG bị throttle khi tab ẩn!
- * Thay thế cho hàm sleep() cũ dùng setTimeout
+ * FIX: Dùng Date.now() deadline thay vì elapsed += wait
+ * → Nếu Worker/setTimeout bị delay, wall-clock vẫn luôn chính xác
  */
 function sleep(ms) {
     const duration = Number.isFinite(ms) ? Math.max(0, ms) : 0;
-    if (duration === 0) {
-        return Promise.resolve();
-    }
+    if (duration === 0) return Promise.resolve();
 
     // Sử dụng Web Worker timer khi có thể
     if (workerAvailable && timerWorker) {
         return new Promise(resolve => {
-            // Chia thành các bước nhỏ để hỗ trợ cancel
-            const stepMs = 200; // Kiểm tra cancel mỗi 200ms
-            let elapsed = 0;
+            const deadline = Date.now() + duration; // FIX: dùng deadline tuyệt đối
+            const stepMs = 200;
 
             const tick = () => {
-                if (cancelRequested) {
-                    resolve();
-                    return;
-                }
-                if (elapsed >= duration) {
-                    resolve();
-                    return;
-                }
+                if (cancelRequested) return resolve();
+                const remaining = deadline - Date.now(); // FIX: tính remaining từ wall-clock
+                if (remaining <= 0) return resolve();
 
-                const wait = Math.min(stepMs, duration - elapsed);
+                const wait = Math.min(stepMs, remaining);
                 const timerId = workerTimerId++;
-                workerCallbacks.set(timerId, () => {
-                    elapsed += wait;
-                    tick();
-                });
+                workerCallbacks.set(timerId, () => tick());
                 timerWorker.postMessage({ type: 'setTimeout', id: timerId, ms: wait });
             };
 
@@ -147,24 +139,14 @@ function sleep(ms) {
 
     // Fallback: dùng setTimeout thường (bị throttle khi tab ẩn)
     return new Promise(resolve => {
+        const deadline = Date.now() + duration; // FIX: dùng deadline tuyệt đối
         const stepMs = 100;
-        let elapsed = 0;
 
         const tick = () => {
-            if (cancelRequested) {
-                resolve();
-                return;
-            }
-            if (elapsed >= duration) {
-                resolve();
-                return;
-            }
-
-            const wait = Math.min(stepMs, duration - elapsed);
-            setTimeout(() => {
-                elapsed += wait;
-                tick();
-            }, wait);
+            if (cancelRequested) return resolve();
+            const remaining = deadline - Date.now(); // FIX: tính remaining từ wall-clock
+            if (remaining <= 0) return resolve();
+            setTimeout(tick, Math.min(stepMs, remaining));
         };
 
         tick();
@@ -173,18 +155,21 @@ function sleep(ms) {
 
 /**
  * Sleep với countdown hiển thị trên UI
- * Cũng sử dụng Worker Timer
+ * FIX: Thêm check isPaused để countdown dừng khi user tạm dừng
  */
 async function sleepWithCountdown(ms, statusPrefix = '⏳ Chờ quota reset') {
     const totalSeconds = Math.ceil(ms / 1000);
     for (let remaining = totalSeconds; remaining > 0; remaining--) {
+        if (cancelRequested) return;
+
+        // FIX: Chờ khi user bấm Tạm dừng
+        while (isPaused && !cancelRequested) {
+            await sleep(200);
+        }
+        if (cancelRequested) return;
+
         updateProgress(completedChunks, totalChunksCount, `${statusPrefix}... ${remaining}s`);
         await sleep(1000);
-
-        if (cancelRequested) {
-            console.log('[Countdown] Cancelled!');
-            return;
-        }
     }
 }
 

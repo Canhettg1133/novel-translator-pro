@@ -80,10 +80,9 @@ function downloadResult() {
 }
 
 // Download partial - tải phần đã dịch được
+// FIX: Bỏ map+filter thừa, dùng filter trực tiếp cho gọn và đúng
 function downloadPartial() {
-    const translatedParts = translatedChunks
-        .map((c, i) => c !== null && c !== undefined ? c : `[⏳ Chunk ${i + 1} chưa dịch]`)
-        .filter((c, i) => translatedChunks[i] !== null && translatedChunks[i] !== undefined);
+    const translatedParts = translatedChunks.filter(c => c !== null && c !== undefined);
 
     if (translatedParts.length === 0) {
         showToast('Chưa có nội dung nào được dịch!', 'warning');
