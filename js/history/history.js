@@ -1,6 +1,6 @@
 ﻿/**
  * Novel Translator Pro - History Management
- * Quáº£n lĂ½ lá»‹ch sá»­ dá»‹ch
+ * Quản lý lịch sử dịch
  */
 
 // ============================================
@@ -257,10 +257,10 @@ function renderHistoryList() {
     if (!container) return; // Mobile might not have this element
     const countBadge = document.getElementById('historyCount');
 
-    if (countBadge) countBadge.textContent = `${translationHistory.length} báº£n`;
+    if (countBadge) countBadge.textContent = `${translationHistory.length} bản`;
 
     if (translationHistory.length === 0) {
-        container.innerHTML = '<p class="empty-message">ChÆ°a cĂ³ lá»‹ch sá»­ dá»‹ch nĂ o.</p>';
+        container.innerHTML = '<p class="empty-message">Chưa có lịch sử dịch nào.</p>';
         return;
     }
 
@@ -268,7 +268,7 @@ function renderHistoryList() {
 
     container.innerHTML = sorted.map(item => {
         const progress = Math.round((item.completedChunks / item.totalChunks) * 100);
-        const statusIcon = item.isComplete ? 'âœ…' : 'â³';
+        const statusIcon = item.isComplete ? '✅' : '⏳';
         const date = new Date(item.date);
         const dateStr = date.toLocaleDateString('vi-VN') + ' ' + date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
 
@@ -278,18 +278,18 @@ function renderHistoryList() {
                 <div class="history-info">
                     <div class="history-name">${escapeHtml(item.name)}</div>
                     <div class="history-meta">
-                        <span>đŸ“… ${dateStr}</span>
-                        <span>đŸ“ ${formatNumber(item.charCount)} chá»¯</span>
-                        <span>đŸ“¦ ${item.completedChunks}/${item.totalChunks} chunks</span>
+                        <span>📅 ${dateStr}</span>
+                        <span>đŸ“ ${formatNumber(item.charCount)} chữ</span>
+                        <span>📦 ${item.completedChunks}/${item.totalChunks} chunks</span>
                     </div>
                 </div>
                 <div class="history-progress">
                     <div class="history-progress-fill ${item.isComplete ? 'complete' : ''}" style="width: ${progress}%"></div>
                 </div>
                 <div class="history-btns">
-                    ${!item.isComplete ? `<button onclick="continueFromHistory('${item.id}')" title="Tiáº¿p tá»¥c dá»‹ch">â–¶ï¸</button>` : ''}
-                    <button onclick="loadFromHistory('${item.id}')" title="Xem/Táº£i vá»">đŸ‘ï¸</button>
-                    <button onclick="deleteFromHistory('${item.id}')" class="btn-delete" title="XĂ³a">đŸ—‘ï¸</button>
+                    ${!item.isComplete ? `<button onclick="continueFromHistory('${item.id}')" title="Tiếp tục dịch">â–¶ï¸</button>` : ''}
+                    <button onclick="loadFromHistory('${item.id}')" title="Xem/Tải vá»">đŸ‘ï¸</button>
+                    <button onclick="deleteFromHistory('${item.id}')" class="btn-delete" title="Xóa">đŸ—‘️</button>
                 </div>
             </div>
         `;
@@ -299,18 +299,18 @@ function renderHistoryList() {
 function continueFromHistory(id) {
     const item = translationHistory.find(h => h.id === id);
     if (!item) {
-        showToast('KhĂ´ng tĂ¬m tháº¥y lá»‹ch sá»­!', 'error');
+        showToast('Không tìm thấy lịch sử!', 'error');
         return;
     }
 
     if (item.isComplete) {
-        showToast('Báº£n dá»‹ch nĂ y Ä‘Ă£ hoĂ n thĂ nh!', 'info');
+        showToast('Bản dịch này đã hoàn thành!', 'info');
         loadFromHistory(id);
         return;
     }
 
     if (isTranslating) {
-        showToast('Äang cĂ³ báº£n dá»‹ch khĂ¡c Ä‘ang cháº¡y!', 'warning');
+        showToast('Äang có bản dịch khác đang chạy!', 'warning');
         return;
     }
 
@@ -345,16 +345,16 @@ function continueFromHistory(id) {
 
     // Show current partial output for user visibility
     document.getElementById('translatedText').value = translatedChunks
-        .map((chunk, idx) => chunk !== null ? chunk : `[â³ ChÆ°a dá»‹ch chunk ${idx + 1}]`)
+        .map((chunk, idx) => chunk !== null ? chunk : `[â³ Chưa dịch chunk ${idx + 1}]`)
         .join('\n\n');
 
     updateStats();
     if (!canResumePrecisely) {
         // Avoid overwriting old legacy history with a wrong "resume" state.
         currentHistoryId = null;
-        showToast('Báº£n lÆ°u cÅ© khĂ´ng cĂ³ dá»¯ liá»‡u chunk chi tiáº¿t, sáº½ táº¡o lÆ°á»£t dá»‹ch má»›i Ä‘á»ƒ trĂ¡nh sai lá»‡ch.', 'warning');
+        showToast('Bản lưu cũ không có dữ liệu chunk chi tiết, sẽ tạo lượt dịch mới để tránh sai lệch.', 'warning');
     } else {
-        showToast(`ÄĂ£ táº£i "${item.name}" - Tiáº¿p tá»¥c tá»« chunk ${completedChunks}/${totalChunksCount}`, 'success');
+        showToast(`ĐĂ£ tải "${item.name}" - Tiếp tục từ chunk ${completedChunks}/${totalChunksCount}`, 'success');
     }
     document.getElementById('translateBtn').scrollIntoView({ behavior: 'smooth' });
 }
@@ -362,7 +362,7 @@ function continueFromHistory(id) {
 function loadFromHistory(id) {
     const item = translationHistory.find(h => h.id === id);
     if (!item) {
-        showToast('KhĂ´ng tĂ¬m tháº¥y lá»‹ch sá»­!', 'error');
+        showToast('Không tìm thấy lịch sử!', 'error');
         return;
     }
 
@@ -373,40 +373,40 @@ function loadFromHistory(id) {
     document.getElementById('resultSection').style.display = 'block';
 
     updateStats();
-    showToast(`ÄĂ£ táº£i "${item.name}"`, 'success');
+    showToast(`ĐĂ£ tải "${item.name}"`, 'success');
     document.getElementById('resultSection').scrollIntoView({ behavior: 'smooth' });
 }
 
 function deleteFromHistory(id) {
-    if (!confirm('Báº¡n cĂ³ cháº¯c muá»‘n xĂ³a báº£n dá»‹ch nĂ y?')) {
+    if (!confirm('Bạn có chắc muốn xóa bản dịch này?')) {
         return;
     }
 
     translationHistory = translationHistory.filter(h => h.id !== id);
     saveHistory();
     renderHistoryList();
-    showToast('ÄĂ£ xĂ³a khá»i lá»‹ch sá»­!', 'info');
+    showToast('ÄĂ£ xóa khá»i lịch sử!', 'info');
 }
 
 function clearAllHistory() {
     if (translationHistory.length === 0) {
-        showToast('Lá»‹ch sá»­ Ä‘Ă£ trá»‘ng!', 'info');
+        showToast('Lịch sử đã trống!', 'info');
         return;
     }
 
-    if (!confirm(`Báº¡n cĂ³ cháº¯c muá»‘n xĂ³a táº¥t cáº£ ${translationHistory.length} báº£n dá»‹ch?`)) {
+    if (!confirm(`Bạn có chắc muốn xóa tất cả ${translationHistory.length} bản dịch?`)) {
         return;
     }
 
     translationHistory = [];
     saveHistory();
     renderHistoryList();
-    showToast('ÄĂ£ xĂ³a táº¥t cáº£ lá»‹ch sá»­!', 'success');
+    showToast('ĐĂ£ xóa tất cả lịch sử!', 'success');
 }
 
 function exportHistory() {
     if (translationHistory.length === 0) {
-        showToast('KhĂ´ng cĂ³ lá»‹ch sá»­ Ä‘á»ƒ xuáº¥t!', 'warning');
+        showToast('Không có lịch sử để xuất!', 'warning');
         return;
     }
 
@@ -427,7 +427,7 @@ function exportHistory() {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 
-    showToast(`ÄĂ£ xuáº¥t ${translationHistory.length} báº£n dá»‹ch!`, 'success');
+    showToast(`ĐĂ£ xuất ${translationHistory.length} bản dịch!`, 'success');
 }
 
 function importHistory(event) {
@@ -461,11 +461,11 @@ function importHistory(event) {
 
             saveHistory();
             renderHistoryList();
-            showToast(`ÄĂ£ nháº­p ${newCount}/${importCount} báº£n dá»‹ch má»›i!`, 'success');
+            showToast(`ĐĂ£ nhập ${newCount}/${importCount} bản dịch mới!`, 'success');
 
         } catch (error) {
             console.error('Import error:', error);
-            showToast('File khĂ´ng há»£p lá»‡!', 'error');
+            showToast('File không hợp lệ!', 'error');
         }
     };
     reader.readAsText(file);
@@ -492,10 +492,10 @@ function isChunkSuccessfullyTranslated(chunkText) {
     if (!text) return false;
 
     // Markers for failed / placeholder chunks
-    if (text.startsWith('[Lá»–I CHUNK')) return false;
-    if (/^\[âŒ\s*Chunk\s+\d+\s+tháº¥t báº¡i\]/i.test(text)) return false;
-    if (text.includes('Cáº¦N Dá»CH THá»¦ CĂ”NG')) return false;
-    if (/^\[â³\s*ChÆ°a dá»‹ch chunk/i.test(text)) return false;
+    if (text.startsWith('[LỖI CHUNK')) return false;
+    if (/^\[âŒ\s*Chunk\s+\d+\s+thất bại\]/i.test(text)) return false;
+    if (text.includes('CẦN DỊCH THỦ CÔNG')) return false;
+    if (/^\[â³\s*Chưa dịch chunk/i.test(text)) return false;
 
     return true;
 }

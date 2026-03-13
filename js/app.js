@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Novel Translator Pro - Main Application
  * Entry point - khởi tạo và điều phối ứng dụng
  */

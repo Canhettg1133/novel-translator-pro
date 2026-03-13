@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Novel Translator Pro - Gemini API
  * Gọi Gemini Cloud API hoặc Proxy API để dịch văn bản
  */
