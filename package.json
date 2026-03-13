@@ -23,12 +23,14 @@
       "output": "dist"
     },
     "files": [
-      "**/*",
-      "!node_modules/**/*",
-      "!dist/**/*",
-      "!backup_old/**/*",
-      "!.git/**/*",
-      "!create-icon.js"
+      "main.js",
+      "index.html",
+      "style.css",
+      "manifest.json",
+      "sw.js",
+      "js/**/*",
+      "icons/**/*",
+      "package.json"
     ],
     "forceCodeSigning": false,
     "win": {
