@@ -410,14 +410,14 @@ function renderModelsList() {
 // ============================================
 // INITIALIZATION
 // ============================================
-document.addEventListener('DOMContentLoaded', () => {
-    initializeApp();
+document.addEventListener('DOMContentLoaded', async () => {
+    await initializeApp();
 });
 
-function initializeApp() {
+async function initializeApp() {
     loadGeminiModels();
     loadSettings();
-    loadHistory();
+    await loadHistory();
     setupEventListeners();
     updateStats();
     renderApiKeysList();

@@ -697,6 +697,9 @@
     <!-- 1. Main App (Global variables, PROMPT_TEMPLATES, GEMINI_MODELS, init) -->
     <script src="js/app.js"></script>
 
+    <!-- 1b. Worker Timer (PHẢI load trước tất cả module dùng sleep() - chống throttle tab ẩn) -->
+    <script src="js/worker-timer.js"></script>
+
     <!-- 2. Gemini API -->
     <script src="js/gemini/model-rotation.js"></script>
     <script src="js/gemini/rpd-tracker.js"></script>
@@ -706,6 +709,7 @@
     <script src="js/translation/chunker.js"></script>
     <script src="js/translation/retry.js"></script>
     <script src="js/translation/engine.js"></script>
+
 
     <!-- 4. UI Components -->
     <script src="js/ui/progress.js"></script>

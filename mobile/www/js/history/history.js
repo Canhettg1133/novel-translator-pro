@@ -1,58 +1,171 @@
-/**
+﻿/**
  * Novel Translator Pro - History Management
- * Quản lý lịch sử dịch
+ * Quáº£n lĂ½ lá»‹ch sá»­ dá»‹ch
  */
 
 // ============================================
 // HISTORY MANAGEMENT
 // ============================================
-function loadHistory() {
-    const saved = localStorage.getItem('novelTranslatorHistory');
-    if (saved) {
+const HISTORY_STORAGE_KEY = 'novelTranslatorHistory';
+const HISTORY_DB_NAME = 'NovelTranslatorDB';
+const HISTORY_DB_VERSION = 1;
+const HISTORY_DB_STORE = 'keyValue';
+const HISTORY_DB_RECORD_KEY = 'translationHistory';
+let historyDbPromise = null;
+let historyWriteQueue = Promise.resolve();
+
+function hasIndexedDBHistory() {
+    return typeof indexedDB !== 'undefined';
+}
+
+function openHistoryDB() {
+    if (!hasIndexedDBHistory()) {
+        return Promise.reject(new Error('IndexedDB not supported'));
+    }
+    if (historyDbPromise) {
+        return historyDbPromise;
+    }
+
+    historyDbPromise = new Promise((resolve, reject) => {
+        const request = indexedDB.open(HISTORY_DB_NAME, HISTORY_DB_VERSION);
+
+        request.onupgradeneeded = () => {
+            const db = request.result;
+            if (!db.objectStoreNames.contains(HISTORY_DB_STORE)) {
+                db.createObjectStore(HISTORY_DB_STORE, { keyPath: 'key' });
+            }
+        };
+
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error || new Error('Failed to open history DB'));
+    });
+
+    return historyDbPromise;
+}
+
+function readHistoryFromIndexedDB() {
+    if (!hasIndexedDBHistory()) {
+        return Promise.resolve({ found: false, data: [] });
+    }
+
+    return openHistoryDB().then(db => new Promise((resolve, reject) => {
+        const tx = db.transaction(HISTORY_DB_STORE, 'readonly');
+        const store = tx.objectStore(HISTORY_DB_STORE);
+        const req = store.get(HISTORY_DB_RECORD_KEY);
+
+        req.onsuccess = () => {
+            const value = req.result?.value;
+            if (Array.isArray(value)) {
+                resolve({ found: true, data: value });
+            } else {
+                resolve({ found: false, data: [] });
+            }
+        };
+        req.onerror = () => reject(req.error || new Error('Failed to read history DB'));
+    })).catch(err => {
+        console.warn('[History] IndexedDB read failed:', err);
+        return { found: false, data: [] };
+    });
+}
+
+function writeHistoryToIndexedDB(data) {
+    if (!hasIndexedDBHistory()) {
+        return Promise.resolve(false);
+    }
+
+    return openHistoryDB().then(db => new Promise((resolve, reject) => {
+        const tx = db.transaction(HISTORY_DB_STORE, 'readwrite');
+        const store = tx.objectStore(HISTORY_DB_STORE);
+        store.put({
+            key: HISTORY_DB_RECORD_KEY,
+            value: data,
+            updatedAt: new Date().toISOString()
+        });
+
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => reject(tx.error || new Error('Failed to write history DB'));
+        tx.onabort = () => reject(tx.error || new Error('History DB transaction aborted'));
+    })).catch(err => {
+        console.warn('[History] IndexedDB write failed:', err);
+        return false;
+    });
+}
+
+function persistHistoryFallbackToLocalStorage(saveData) {
+    try {
+        localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(saveData));
+        return;
+    } catch (e) {
+        console.error('Error saving history (localStorage fallback):', e);
+
+        if (e.name !== 'QuotaExceededError') {
+            return;
+        }
+
+        translationHistory = translationHistory.slice(-5);
         try {
-            translationHistory = JSON.parse(saved);
-        } catch (e) {
-            console.error('Error loading history:', e);
+            const lightHistory = translationHistory.map(item => ({
+                ...item,
+                originalText: item.originalText ? item.originalText.substring(0, 2000) : '',
+                translatedText: item.translatedText ? item.translatedText.substring(0, 2000) : '',
+                chunks: []
+            }));
+            localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(lightHistory));
+            showToast('Đã xóa bớt lịch sử cũ để tiết kiệm bộ nhớ.', 'warning');
+        } catch (e2) {
+            localStorage.removeItem(HISTORY_STORAGE_KEY);
             translationHistory = [];
+            showToast('Đã xóa lịch sử để giải phóng bộ nhớ.', 'warning');
         }
     }
 }
 
-function saveHistory() {
-    try {
-        if (translationHistory.length > 20) {
-            translationHistory = translationHistory.slice(-20);
-        }
+async function loadHistory() {
+    translationHistory = [];
 
-        // Lưu full text — chỉ bỏ chunks array để tiết kiệm
-        const saveData = translationHistory.map(item => ({
-            ...item,
-            chunks: [] // Chunks array quá lớn, không lưu
-        }));
-
-        localStorage.setItem('novelTranslatorHistory', JSON.stringify(saveData));
-    } catch (e) {
-        console.error('Error saving history:', e);
-
-        if (e.name === 'QuotaExceededError') {
-            // Nếu đầy, cắt bớt text để vừa
-            translationHistory = translationHistory.slice(-5);
-            try {
-                const lightHistory = translationHistory.map(item => ({
-                    ...item,
-                    originalText: item.originalText ? item.originalText.substring(0, 2000) : '',
-                    translatedText: item.translatedText ? item.translatedText.substring(0, 2000) : '',
-                    chunks: []
-                }));
-                localStorage.setItem('novelTranslatorHistory', JSON.stringify(lightHistory));
-                showToast('Đã xóa bớt lịch sử cũ để tiết kiệm bộ nhớ.', 'warning');
-            } catch (e2) {
-                localStorage.removeItem('novelTranslatorHistory');
-                translationHistory = [];
-                showToast('Đã xóa lịch sử để giải phóng bộ nhớ.', 'warning');
-            }
-        }
+    const dbResult = await readHistoryFromIndexedDB();
+    if (dbResult.found) {
+        translationHistory = Array.isArray(dbResult.data) ? dbResult.data : [];
+        return;
     }
+
+    const saved = localStorage.getItem(HISTORY_STORAGE_KEY);
+    if (!saved) {
+        return;
+    }
+
+    try {
+        const parsed = JSON.parse(saved);
+        translationHistory = Array.isArray(parsed) ? parsed : [];
+
+        const migrated = await writeHistoryToIndexedDB(translationHistory);
+        if (migrated) {
+            localStorage.removeItem(HISTORY_STORAGE_KEY);
+        }
+    } catch (e) {
+        console.error('Error loading history:', e);
+        translationHistory = [];
+    }
+}
+
+function saveHistory() {
+    if (translationHistory.length > 20) {
+        translationHistory = translationHistory.slice(-20);
+    }
+
+    const saveData = translationHistory.map(item => ({
+        ...item,
+        chunks: []
+    }));
+
+    historyWriteQueue = historyWriteQueue
+        .catch(() => { })
+        .then(async () => {
+            const savedToIndexedDB = await writeHistoryToIndexedDB(saveData);
+            if (!savedToIndexedDB) {
+                persistHistoryFallbackToLocalStorage(saveData);
+            }
+        });
 }
 
 function addToHistory(name, originalText, translatedText, chunks, completedCount, totalCount) {
@@ -105,10 +218,10 @@ function renderHistoryList() {
     if (!container) return;
     const countBadge = document.getElementById('historyCount');
 
-    if (countBadge) countBadge.textContent = `${translationHistory.length} bản`;
+    if (countBadge) countBadge.textContent = `${translationHistory.length} báº£n`;
 
     if (translationHistory.length === 0) {
-        container.innerHTML = '<p class="empty-message">Chưa có lịch sử dịch nào.</p>';
+        container.innerHTML = '<p class="empty-message">ChÆ°a cĂ³ lá»‹ch sá»­ dá»‹ch nĂ o.</p>';
         return;
     }
 
@@ -116,7 +229,7 @@ function renderHistoryList() {
 
     container.innerHTML = sorted.map(item => {
         const progress = Math.round((item.completedChunks / item.totalChunks) * 100);
-        const statusIcon = item.isComplete ? '✅' : '⏳';
+        const statusIcon = item.isComplete ? 'âœ…' : 'â³';
         const date = new Date(item.date);
         const dateStr = date.toLocaleDateString('vi-VN') + ' ' + date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
 
@@ -126,18 +239,18 @@ function renderHistoryList() {
                 <div class="history-info">
                     <div class="history-name">${escapeHtml(item.name)}</div>
                     <div class="history-meta">
-                        <span>📅 ${dateStr}</span>
-                        <span>📝 ${formatNumber(item.charCount)} chữ</span>
-                        <span>📦 ${item.completedChunks}/${item.totalChunks} chunks</span>
+                        <span>đŸ“… ${dateStr}</span>
+                        <span>đŸ“ ${formatNumber(item.charCount)} chá»¯</span>
+                        <span>đŸ“¦ ${item.completedChunks}/${item.totalChunks} chunks</span>
                     </div>
                 </div>
                 <div class="history-progress">
                     <div class="history-progress-fill ${item.isComplete ? 'complete' : ''}" style="width: ${progress}%"></div>
                 </div>
                 <div class="history-btns">
-                    ${!item.isComplete ? `<button onclick="continueFromHistory('${item.id}')" title="Tiếp tục dịch">▶️</button>` : ''}
-                    <button onclick="loadFromHistory('${item.id}')" title="Xem/Tải về">👁️</button>
-                    <button onclick="deleteFromHistory('${item.id}')" class="btn-delete" title="Xóa">🗑️</button>
+                    ${!item.isComplete ? `<button onclick="continueFromHistory('${item.id}')" title="Tiáº¿p tá»¥c dá»‹ch">â–¶ï¸</button>` : ''}
+                    <button onclick="loadFromHistory('${item.id}')" title="Xem/Táº£i vá»">đŸ‘ï¸</button>
+                    <button onclick="deleteFromHistory('${item.id}')" class="btn-delete" title="XĂ³a">đŸ—‘ï¸</button>
                 </div>
             </div>
         `;
@@ -147,18 +260,18 @@ function renderHistoryList() {
 function continueFromHistory(id) {
     const item = translationHistory.find(h => h.id === id);
     if (!item) {
-        showToast('Không tìm thấy lịch sử!', 'error');
+        showToast('KhĂ´ng tĂ¬m tháº¥y lá»‹ch sá»­!', 'error');
         return;
     }
 
     if (item.isComplete) {
-        showToast('Bản dịch này đã hoàn thành!', 'info');
+        showToast('Báº£n dá»‹ch nĂ y Ä‘Ă£ hoĂ n thĂ nh!', 'info');
         loadFromHistory(id);
         return;
     }
 
     if (isTranslating) {
-        showToast('Đang có bản dịch khác đang chạy!', 'warning');
+        showToast('Äang cĂ³ báº£n dá»‹ch khĂ¡c Ä‘ang cháº¡y!', 'warning');
         return;
     }
 
@@ -172,14 +285,14 @@ function continueFromHistory(id) {
     totalChunksCount = item.totalChunks || 0;
 
     updateStats();
-    showToast(`Đã tải "${item.name}" - Tiếp tục từ chunk ${completedChunks}/${totalChunksCount}`, 'success');
+    showToast(`ÄĂ£ táº£i "${item.name}" - Tiáº¿p tá»¥c tá»« chunk ${completedChunks}/${totalChunksCount}`, 'success');
     document.getElementById('translateBtn').scrollIntoView({ behavior: 'smooth' });
 }
 
 function loadFromHistory(id) {
     const item = translationHistory.find(h => h.id === id);
     if (!item) {
-        showToast('Không tìm thấy lịch sử!', 'error');
+        showToast('KhĂ´ng tĂ¬m tháº¥y lá»‹ch sá»­!', 'error');
         return;
     }
 
@@ -190,40 +303,40 @@ function loadFromHistory(id) {
     document.getElementById('resultSection').style.display = 'block';
 
     updateStats();
-    showToast(`Đã tải "${item.name}"`, 'success');
+    showToast(`ÄĂ£ táº£i "${item.name}"`, 'success');
     document.getElementById('resultSection').scrollIntoView({ behavior: 'smooth' });
 }
 
 function deleteFromHistory(id) {
-    if (!confirm('Bạn có chắc muốn xóa bản dịch này?')) {
+    if (!confirm('Báº¡n cĂ³ cháº¯c muá»‘n xĂ³a báº£n dá»‹ch nĂ y?')) {
         return;
     }
 
     translationHistory = translationHistory.filter(h => h.id !== id);
     saveHistory();
     renderHistoryList();
-    showToast('Đã xóa khỏi lịch sử!', 'info');
+    showToast('ÄĂ£ xĂ³a khá»i lá»‹ch sá»­!', 'info');
 }
 
 function clearAllHistory() {
     if (translationHistory.length === 0) {
-        showToast('Lịch sử đã trống!', 'info');
+        showToast('Lá»‹ch sá»­ Ä‘Ă£ trá»‘ng!', 'info');
         return;
     }
 
-    if (!confirm(`Bạn có chắc muốn xóa tất cả ${translationHistory.length} bản dịch?`)) {
+    if (!confirm(`Báº¡n cĂ³ cháº¯c muá»‘n xĂ³a táº¥t cáº£ ${translationHistory.length} báº£n dá»‹ch?`)) {
         return;
     }
 
     translationHistory = [];
     saveHistory();
     renderHistoryList();
-    showToast('Đã xóa tất cả lịch sử!', 'success');
+    showToast('ÄĂ£ xĂ³a táº¥t cáº£ lá»‹ch sá»­!', 'success');
 }
 
 function exportHistory() {
     if (translationHistory.length === 0) {
-        showToast('Không có lịch sử để xuất!', 'warning');
+        showToast('KhĂ´ng cĂ³ lá»‹ch sá»­ Ä‘á»ƒ xuáº¥t!', 'warning');
         return;
     }
 
@@ -244,7 +357,7 @@ function exportHistory() {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 
-    showToast(`Đã xuất ${translationHistory.length} bản dịch!`, 'success');
+    showToast(`ÄĂ£ xuáº¥t ${translationHistory.length} báº£n dá»‹ch!`, 'success');
 }
 
 function importHistory(event) {
@@ -278,11 +391,11 @@ function importHistory(event) {
 
             saveHistory();
             renderHistoryList();
-            showToast(`Đã nhập ${newCount}/${importCount} bản dịch mới!`, 'success');
+            showToast(`ÄĂ£ nháº­p ${newCount}/${importCount} báº£n dá»‹ch má»›i!`, 'success');
 
         } catch (error) {
             console.error('Import error:', error);
-            showToast('File không hợp lệ!', 'error');
+            showToast('File khĂ´ng há»£p lá»‡!', 'error');
         }
     };
     reader.readAsText(file);
@@ -301,3 +414,4 @@ function escapeHtml(text) {
 function formatNumber(num) {
     return num.toLocaleString('vi-VN');
 }
+

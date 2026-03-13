@@ -34,53 +34,10 @@ function formatTime(seconds) {
 }
 
 // ============================================
-// SLEEP UTILITIES
+// SLEEP UTILITIES - Đã chuyển sang js/worker-timer.js
+// Sử dụng Web Worker timer để không bị throttle khi tab ẩn
+// Các hàm sleep(), sleepWithCountdown() được định nghĩa trong worker-timer.js
 // ============================================
-function sleep(ms) {
-    const duration = Number.isFinite(ms) ? Math.max(0, ms) : 0;
-    if (duration === 0) {
-        return Promise.resolve();
-    }
-
-    // Make long waits interruptible so cancel feels instant.
-    return new Promise(resolve => {
-        const stepMs = 100;
-        let elapsed = 0;
-
-        const tick = () => {
-            if (cancelRequested) {
-                resolve();
-                return;
-            }
-            if (elapsed >= duration) {
-                resolve();
-                return;
-            }
-
-            const wait = Math.min(stepMs, duration - elapsed);
-            setTimeout(() => {
-                elapsed += wait;
-                tick();
-            }, wait);
-        };
-
-        tick();
-    });
-}
-
-// Sleep với countdown hiển thị trên UI
-async function sleepWithCountdown(ms, statusPrefix = '⏳ Chờ quota reset') {
-    const totalSeconds = Math.ceil(ms / 1000);
-    for (let remaining = totalSeconds; remaining > 0; remaining--) {
-        updateProgress(completedChunks, totalChunksCount, `${statusPrefix}... ${remaining}s`);
-        await sleep(1000);
-
-        if (cancelRequested) {
-            console.log('[Countdown] Cancelled!');
-            return;
-        }
-    }
-}
 
 // ============================================
 // RESULT ACTIONS
